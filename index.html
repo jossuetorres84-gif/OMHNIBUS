@@ -42,13 +42,19 @@
     <!-- Lienzo de Chat Concurrente -->
     <main id="chat-screen" class="flex-1 overflow-y-auto my-4 space-y-4 pr-1 text-sm">
       <div id="empty-notice" class="text-center text-slate-600 mt-20 text-xs">
-        Ecosistema listo. Usa palabras clave como "busca", "noticias" o "actualidad" para activar el rastreo en red en tiempo real.
+        Ecosistema listo. Usa palabras clave como "busca" para activar internet en tiempo real, o enciende el Consejo abajo para recibir opiniones múltiples concurrentes.
       </div>
       <div id="messages-container" class="space-y-4"></div>
     </main>
 
     <!-- Panel de Control Inferior -->
     <footer id="controls-footer" class="space-y-2">
+      <div class="flex items-center justify-between bg-slate-900/50 p-2 rounded-lg border border-slate-800/60 text-xs">
+        <span class="text-slate-400">Activar ÓmhnibusCouncil (Fusión de Criterio Multi-Modelo)</span>
+        <button id="council-btn" class="w-9 h-5 flex items-center bg-slate-700 rounded-full p-1 duration-200">
+          <span id="council-dot" class="bg-white w-3 h-3 rounded-full shadow-sm transition-transform"></span>
+        </button>
+      </div>
       <div class="flex gap-2">
         <input type="text" id="user-input" placeholder="Enviar instrucción..." class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-teal-500">
         <button id="launch-btn" class="bg-teal-600 hover:bg-teal-500 text-white px-4 py-2 rounded-lg text-sm font-semibold">Lanzar</button>
@@ -65,6 +71,7 @@
     };
 
     let showManager = false;
+    let useCouncil = false;
 
     // Cargar inputs al iniciar
     document.getElementById('key-gemini').value = keys.gemini;
@@ -103,6 +110,20 @@
       document.getElementById('chat-screen').classList.remove('hidden');
     }
 
+    // Manejador del Switch del Consejo
+    document.getElementById('council-btn').addEventListener('click', () => {
+      useCouncil = !useCouncil;
+      const btn = document.getElementById('council-btn');
+      const dot = document.getElementById('council-dot');
+      if (useCouncil) {
+        btn.classList.replace('bg-slate-700', 'bg-teal-500');
+        dot.classList.add('translate-x-4');
+      } else {
+        btn.classList.replace('bg-teal-500', 'bg-slate-700');
+        dot.classList.remove('translate-x-4');
+      }
+    });
+
     function appendUserMessage(text) {
       const container = document.getElementById('messages-container');
       const msgDiv = document.createElement('div');
@@ -127,6 +148,8 @@
       block.appendChild(header);
       block.appendChild(content);
       container.appendChild(block);
+      
+      document.getElementById('chat-screen').scrollTop = document.getElementById('chat-screen').scrollHeight;
       return { content, header };
     }
 
@@ -140,12 +163,31 @@
       document.getElementById('empty-notice').classList.add('hidden');
       appendUserMessage(prompt);
 
-      // --- ENRUTAMIENTO INTELIGENTE AMPLIADO PARA RED TIEMPO REAL ---
+      // Si el Consejo está activo, forzar llamadas simultáneas con roles especializados
+      if (useCouncil) {
+        const baseCouncilPrompt = `Actúas en el ecosistema síncrono ÓmhnibusCouncil. Analiza la siguiente instrucción de nivel Senior: "${prompt}"\n\n`;
+        
+        if (keys.gemini) {
+          const isSearchRequest = /busca|internet|red|tiempo real|noticias|actual|hoy/i.test(prompt);
+          fetchGemini(baseCouncilPrompt + "Asume el rol de PERFORMANCE EXPERT y optimización de flujos.", isSearchRequest);
+        }
+        if (keys.openai) {
+          fetchOpenAI(baseCouncilPrompt + "Asume el rol de SKEPTICAL ARCHITECT, auditando la lógica técnica y detectando fallos potenciales estructurales.");
+        }
+        if (keys.openrouter) {
+          fetchOpenRouter(baseCouncilPrompt + "Asume el rol de GENERAL KNOWLEDGE SUMMARY, consolidando contexto histórico de soporte.");
+        }
+        if (keys.groq) {
+          fetchGroq(baseCouncilPrompt + "Asume el rol de SECURITY AUDITOR y análisis de riesgos en tiempo de ejecución.");
+        }
+        return; // Detener ejecución ordinaria del router inteligente
+      }
+
+      // --- ENRUTAMIENTO INTELIGENTE ORDINARIO (Si el Consejo está apagado) ---
       const isSearchRequest = /busca|internet|red|tiempo real|noticias|actual|hoy|clima|precio/i.test(prompt);
       const isCoding = /código|programar|script|función|html|css|js|java|python|json/i.test(prompt);
       const isComplex = prompt.length > 120 || /analiza|resume|debate|explica|comparar|audita/i.test(prompt);
 
-      // Regla prioritaria: Si solicita explícitamente datos en tiempo real de internet, forzar Gemini Cloud con Web Grounding
       if (isSearchRequest && keys.gemini) {
         fetchGemini(prompt, true);
       } else if (isCoding && keys.openai) { 
@@ -156,8 +198,7 @@
         fetchOpenRouter(prompt); 
       }
 
-      // Groq corre como nodo paralelo ultra-veloz si está activo
-      if (keys.groq) { 
+      if (keys.groq && !isSearchRequest && !isCoding && !isComplex) { 
         fetchGroq(prompt); 
       }
     });
@@ -170,17 +211,11 @@
 
     // --- CONECTORES DE APIS ---
     async function fetchGemini(prompt, enableSearch = false) {
-      const label = enableSearch ? 'Google Gemini (Búsqueda Web Activa 🌐)' : 'Google Gemini Cloud';
-      const ui = createEngineBlock(label);
+      const label = enableSearch ? 'Gemini Council (Performance / Web 🌐)' : 'Gemini Council (Performance)';
+      const ui = createEngineBlock(useCouncil ? label : 'Google Gemini Cloud');
       try {
-        // Estructura de payload compatible con Gemini 2.5 y habilitación de Grounding
-        const payload = {
-          contents: [{ parts: [{ text: prompt }] }]
-        };
-
-        if (enableSearch) {
-          payload.tools = [{ googleSearch: {} }];
-        }
+        const payload = { contents: [{ parts: [{ text: prompt }] }] };
+        if (enableSearch) { payload.tools = [{ googleSearch: {} }]; }
 
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${keys.gemini}`, {
           method: 'POST',
@@ -188,28 +223,25 @@
           body: JSON.stringify(payload)
         });
         const data = await res.json();
-        
         let responseText = data.candidates[0].content.parts[0].text;
         
-        // Mostrar fuentes de búsqueda si están disponibles en los metadatos
         if (enableSearch && data.candidates[0].groundingMetadata?.groundingChunks) {
-          responseText += '\n\n🌐 **Fuentes consultadas en tiempo real:**';
+          responseText += '\n\n🌐 **Fuentes de red:**';
           data.candidates[0].groundingMetadata.groundingChunks.forEach(chunk => {
-            if (chunk.web?.uri) {
-              responseText += `\n- [${chunk.web.title || 'Enlace'}](${chunk.web.uri})`;
-            }
+            if (chunk.web?.uri) responseText += `\n- [${chunk.web.title || 'Link'}](${chunk.web.uri})`;
           });
         }
 
         ui.content.innerText = responseText;
-        ui.header.innerHTML = `<span>🤖 ${label}</span> <span class="text-green-400 text-[10px]">🟢 ONLINE</span>`;
+        ui.header.innerHTML = `<span>🤖 ${useCouncil ? label : 'Google Gemini Cloud'}</span> <span class="text-green-400 text-[10px]">🟢 ONLINE</span>`;
       } catch (err) {
-        ui.content.innerText = 'Error en Gemini Cloud o en la consulta de red.';
+        ui.content.innerText = 'Error en Gemini Cloud.';
       }
     }
 
     async function fetchOpenAI(prompt) {
-      const ui = createEngineBlock('OpenAI ChatGPT');
+      const label = useCouncil ? 'OpenAI Council (Skeptical Architect)' : 'OpenAI ChatGPT';
+      const ui = createEngineBlock(label);
       try {
         const res = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -218,14 +250,15 @@
         });
         const data = await res.json();
         ui.content.innerText = data.choices[0].message.content;
-        ui.header.innerHTML = `<span>🤖 OpenAI ChatGPT</span> <span class="text-green-400 text-[10px]">🟢 ONLINE</span>`;
+        ui.header.innerHTML = `<span>🤖 ${label}</span> <span class="text-green-400 text-[10px]">🟢 ONLINE</span>`;
       } catch (err) {
         ui.content.innerText = 'Error en OpenAI.';
       }
     }
 
     async function fetchOpenRouter(prompt) {
-      const ui = createEngineBlock('OpenRouter / Buscando Modelo...');
+      const label = useCouncil ? 'OpenRouter Council (Llama 3 Summary)' : 'MODELO: Llama 3 8B Instruct';
+      const ui = createEngineBlock(useCouncil ? label : 'OpenRouter / Buscando Modelo...');
       try {
         const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
@@ -238,15 +271,16 @@
           body: JSON.stringify({ model: 'meta-llama/llama-3-8b-instruct:free', messages: [{ role: 'user', content: prompt }] })
         });
         const data = await res.json();
-        ui.header.innerHTML = `<span>🤖 MODELO: Llama 3 8B Instruct (Open Source vía OpenRouter)</span> <span class="text-green-400 text-[10px]">🟢 ONLINE</span>`;
         ui.content.innerText = data.choices[0].message.content || JSON.stringify(data);
+        ui.header.innerHTML = `<span>🤖 ${useCouncil ? label : 'Llama 3 (vía OpenRouter)'}</span> <span class="text-green-400 text-[10px]">🟢 ONLINE</span>`;
       } catch (err) {
         ui.content.innerText = 'Error en OpenRouter.';
       }
     }
 
     async function fetchGroq(prompt) {
-      const ui = createEngineBlock('Groq / Buscando Nodo...');
+      const label = useCouncil ? 'Groq Council (Security Auditor)' : 'MODELO: Llama 3.1 8B Instant';
+      const ui = createEngineBlock(useCouncil ? label : 'Groq / Buscando Nodo...');
       try {
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
@@ -254,8 +288,8 @@
           body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: [{ role: 'user', content: prompt }] })
         });
         const data = await res.json();
-        ui.header.innerHTML = `<span>🤖 MODELO: Llama 3.1 8B Instant (Open Source vía Groq)</span> <span class="text-green-400 text-[10px]">🟢 ONLINE</span>`;
         ui.content.innerText = data.choices[0].message.content || JSON.stringify(data);
+        ui.header.innerHTML = `<span>🤖 ${useCouncil ? label : 'Llama 3.1 (vía Groq)'}</span> <span class="text-green-400 text-[10px]">🟢 ONLINE</span>`;
       } catch (err) {
         ui.content.innerText = 'Error en Groq.';
       }
