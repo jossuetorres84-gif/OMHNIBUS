@@ -2,36 +2,65 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <!-- Meta tag crucial para asegurar el correcto escalado en pantallas de smartphones -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <style>
         body, html { 
-            margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #fdfbf7; 
-            /* Evita comportamientos extraños de scroll elástico en móviles */
+            margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; 
+            background-color: #fdfbf7; 
+            transition: background-color 0.3s ease;
             touch-action: none; 
         }
+
+        /* Variables para el sistema de color */
+        body.dark-mode { background-color: #1a1a1a; }
+        body.dark-mode #canvas-container { background-image: radial-gradient(#333 1px, transparent 1px); }
+
         #canvas-container {
             width: 100vw; height: 100vh;
             cursor: grab;
             transform-origin: 0 0;
             background-image: radial-gradient(#dcdcdc 1px, transparent 1px);
             background-size: 40px 40px;
+            transition: background-image 0.3s ease;
         }
+
+        /* Botón fijo que no se mueve con el lienzo */
+        #theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            z-index: 1000;
+            cursor: pointer;
+            background: #e0dcd5;
+            border: none;
+            border-radius: 5px;
+            font-family: sans-serif;
+            font-weight: bold;
+        }
+        body.dark-mode #theme-toggle { background: #333; color: white; }
     </style>
 </head>
 <body>
 
+<button id="theme-toggle">Modo Oscuro</button>
 <div id="canvas-container"></div>
 
 <script>
     const container = document.getElementById('canvas-container');
+    const themeBtn = document.getElementById('theme-toggle');
     let scale = 1;
     let posX = 0;
     let posY = 0;
     let isDragging = false;
     let startX, startY;
 
-    // Zoom universal: Soporta la rueda del mouse y el scroll de trackpads/pantallas
+    // Función de cambio de modo
+    themeBtn.addEventListener('click', () => {
+        document.body.classList.toggle('dark-mode');
+        themeBtn.innerText = document.body.classList.contains('dark-mode') ? 'Modo Claro' : 'Modo Oscuro';
+    });
+
     container.addEventListener('wheel', (e) => {
         e.preventDefault();
         const delta = e.deltaY > 0 ? 0.9 : 1.1;
@@ -39,13 +68,12 @@
         container.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
     }, { passive: false });
 
-    // Desplazamiento Universal usando Pointer Events (Mouse, Touch, Stylus)
     container.addEventListener('pointerdown', (e) => {
         isDragging = true;
         startX = e.clientX - posX;
         startY = e.clientY - posY;
         container.style.cursor = 'grabbing';
-        container.setPointerCapture(e.pointerId); // Captura el puntero incluso si sale del contenedor
+        container.setPointerCapture(e.pointerId);
     });
 
     container.addEventListener('pointermove', (e) => {
