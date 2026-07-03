@@ -45,14 +45,14 @@
     <!-- Lienzo Estilo Chatbot -->
     <main id="chat-screen" class="flex-1 overflow-y-auto my-4 space-y-4 pr-1 text-sm scroll-smooth">
       <div id="empty-notice" class="text-center text-slate-600 mt-20 text-xs px-4">
-        Ecosistema síncrono listo. El Router Inteligente decidirá la mejor API según tu mensaje. Activa el Consejo abajo para debate multi-modelo paralelo.
+        Ecosistema listo. El Router Inteligente decidirá la mejor API. Activa el Consejo abajo para recibir respuestas reales de todos tus modelos en paralelo.
       </div>
       <div id="messages-container" class="space-y-4 flex flex-col"></div>
     </main>
 
     <!-- Panel de Control Inferior -->
     <footer id="controls-footer" class="space-y-2">
-      <!-- Botón de Ómhnibus Council Intermitente/Conmutable -->
+      <!-- Botón de Ómhnibus Council -->
       <button id="council-toggle-btn" class="w-full bg-slate-900 hover:bg-slate-850 border border-slate-800 py-2 rounded-xl flex items-center justify-center gap-2 text-xs font-semibold transition-all duration-300">
         <span class="w-2 h-2 rounded-full bg-slate-500 shadow-[0_0_8px_rgba(148,163,184,0.5)]" id="council-indicator"></span>
         <span id="council-btn-text" class="text-slate-400">ÓMHNIBUS COUNCIL: DESACTIVADO</span>
@@ -76,7 +76,9 @@
     let showManager = false;
     let useCouncil = false;
 
-    // Cargar inputs del localStorage
+    // Proxy alternativo y robusto para evitar fallos CORS en cabeceras de autorización
+    const corsProxy = "https://api.allorigins.win/raw?url=";
+
     document.getElementById('key-gemini').value = keys.gemini;
     document.getElementById('key-openai').value = keys.openai;
     document.getElementById('key-openrouter').value = keys.openrouter;
@@ -113,7 +115,6 @@
       document.getElementById('chat-screen').classList.remove('hidden');
     }
 
-    // Lógica Interactiva del Botón del ÓMHNIBUS COUNCIL
     document.getElementById('council-toggle-btn').addEventListener('click', () => {
       useCouncil = !useCouncil;
       const btn = document.getElementById('council-toggle-btn');
@@ -125,8 +126,8 @@
         btn.classList.replace('border-slate-800', 'border-amber-500/50');
         indicator.classList.replace('bg-slate-500', 'bg-amber-400');
         indicator.classList.add('animate-ping');
-        text.innerText = 'ÓMHNIBUS COUNCIL: MODALIDAD MULTI-MODELO ACTIVA';
-        text.className = 'text-amber-400 tracking-wider font-bold';
+        text.innerText = 'ÓMHNIBUS COUNCIL: RESPUESTA MULTI-MODELO REAL ACTIVA';
+        text.className = 'text-amber-400 tracking-wider font-bold text-xs';
         statusLabel.innerText = 'CONSEJO ACTIVO';
         statusLabel.className = 'text-[10px] bg-amber-950 text-amber-400 px-2 py-0.5 rounded-full font-mono border border-amber-800';
       } else {
@@ -152,15 +153,15 @@
     function createEngineBlock(engineName) {
       const container = document.getElementById('messages-container');
       const block = document.createElement('div');
-      block.className = 'p-3 rounded-2xl bg-slate-900 border border-slate-800 space-y-1 text-sm my-1 max-w-[90%] self-start shadow-inner';
+      block.className = 'p-3 rounded-2xl bg-slate-900 border border-slate-800 space-y-1 text-sm my-1 max-w-[90%] self-start shadow-inner w-full';
       
       const header = document.createElement('div');
-      header.className = 'text-[11px] font-bold tracking-wider uppercase text-slate-400 flex justify-between items-center gap-4';
+      header.className = 'text-[11px] font-bold tracking-wider uppercase text-slate-400 flex justify-between items-center gap-4 border-b border-slate-800 pb-1';
       header.innerHTML = `<span>🤖 ${engineName}</span> <span class="text-teal-400 text-[9px] animate-pulse">PROCESANDO...</span>`;
       
       const content = document.createElement('div');
-      content.className = 'text-slate-200 whitespace-pre-wrap pt-1 leading-relaxed';
-      content.innerText = 'Generando respuesta del nodo...';
+      content.className = 'text-slate-300 whitespace-pre-wrap pt-1 leading-relaxed text-xs';
+      content.innerText = 'Esperando transmisión de datos crudos...';
       
       block.appendChild(header);
       block.appendChild(content);
@@ -174,7 +175,6 @@
       screen.scrollTop = screen.scrollHeight;
     }
 
-    // Disparador del Chatbot
     document.getElementById('launch-btn').addEventListener('click', () => {
       const inputEl = document.getElementById('user-input');
       const prompt = inputEl.value.trim();
@@ -184,27 +184,25 @@
       document.getElementById('empty-notice').classList.add('hidden');
       appendUserMessage(prompt);
 
-      // 1. MODALIDAD ÓMHNIBUS COUNCIL: Ráfaga Multi-modelo Directa
       if (useCouncil) {
-        const basePrompt = `Ecosistema ÓmhnibusCouncil activo. Proporciona tu dictamen técnico Senior para la siguiente instrucción:\n"${prompt}"\n\n`;
-        
+        // Enviar peticiones simultáneas reales a cada API activa
         if (keys.gemini) {
           const isSearch = /busca|internet|red|tiempo real|noticias|hoy/i.test(prompt);
-          fetchGemini(basePrompt + "Asume el rol de PERFORMANCE EXPERT enfocado en optimizaciones.", isSearch);
+          fetchGemini(prompt + "\n\n(Responde exclusivamente bajo el rol de: PERFORMANCE EXPERT)", isSearch);
         }
         if (keys.openai) {
-          fetchOpenAI(basePrompt + "Asume el rol de SKEPTICAL ARCHITECT analizando debilidades estructurales.");
+          fetchOpenAI(prompt + "\n\n(Responde exclusivamente bajo el rol de: SKEPTICAL ARCHITECT)");
         }
         if (keys.openrouter) {
-          fetchOpenRouter(basePrompt + "Asume el rol de CONTEXT ANALYST proveyendo referencias globales.");
+          fetchOpenRouter(prompt + "\n\n(Responde exclusivamente bajo el rol de: CONTEXT SUMMARY)");
         }
         if (keys.groq) {
-          fetchGroq(basePrompt + "Asume el rol de SECURITY AUDITOR mitigando vulnerabilidades.");
+          fetchGroq(prompt + "\n\n(Responde exclusivamente bajo el rol de: SECURITY AUDITOR)");
         }
         return; 
       }
 
-      // 2. MODALIDAD ROUTER INTELIGENTE SELECCIONADO (Estrategia por Mensaje)
+      // ROUTER INTELIGENTE INDIVIDUAL
       const isSearchRequest = /busca|internet|red|tiempo real|noticias|actual|hoy|clima/i.test(prompt);
       const isCoding = /código|programar|script|función|html|css|js|java|python|json/i.test(prompt);
       const isComplex = prompt.length > 150 || /analiza|resume|debate|explica|comparar|audita/i.test(prompt);
@@ -222,7 +220,7 @@
       } else if (keys.gemini) {
         fetchGemini(prompt, false);
       } else {
-        alert("Por favor, configura una API en el panel superior.");
+        alert("Configura una API válida primero.");
       }
     });
 
@@ -230,95 +228,118 @@
       if (e.key === 'Enter') document.getElementById('launch-btn').click();
     });
 
-    // --- MANEJADORES DE LAS APIS ---
+    // --- LLAMADAS DIRECTAS CORREGIDAS ---
+
     async function fetchGemini(prompt, enableSearch = false) {
-      const label = enableSearch ? 'Gemini Engine (Web Grounding 🌐)' : 'Gemini Engine';
-      const ui = createEngineBlock(useCouncil ? `Council: ${label}` : label);
+      const label = enableSearch ? 'Google Gemini 2.5 Flash (Web Real 🌐)' : 'Google Gemini 2.5 Flash';
+      const ui = createEngineBlock(useCouncil ? `Council -> ${label}` : label);
       try {
         const payload = { contents: [{ parts: [{ text: prompt }] }] };
         if (enableSearch) payload.tools = [{ googleSearch: {} }];
 
+        // Gemini no tiene problemas de CORS directos desde cliente remoto
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${keys.gemini}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
         const data = await res.json();
+        
         let txt = data.candidates[0].content.parts[0].text;
-
         if (enableSearch && data.candidates[0].groundingMetadata?.groundingChunks) {
-          txt += '\n\n🌐 **Fuentes consultadas en la red:**';
+          txt += '\n\n🌐 **Rastreo web realizado:**';
           data.candidates[0].groundingMetadata.groundingChunks.forEach(chunk => {
-            if (chunk.web?.uri) txt += `\n- [${chunk.web.title || 'Referencia'}](${chunk.web.uri})`;
+            if (chunk.web?.uri) txt += `\n- [${chunk.web.title || 'Link'}](${chunk.web.uri})`;
           });
         }
         ui.content.innerText = txt;
         ui.header.children[1].className = "text-green-400 text-[9px]";
-        ui.header.children[1].innerText = "🟢 COMPLETADO";
+        ui.header.children[1].innerText = "🟢 NODO ONLINE";
       } catch (err) {
-        ui.content.innerText = 'Fallo en la comunicación del nodo Gemini.';
+        ui.content.innerText = 'Fallo de respuesta o API Key incorrecta en Gemini.';
+        ui.header.children[1].className = "text-red-500 text-[9px]";
+        ui.header.children[1].innerText = "🔴 ERROR";
       }
       autoScroll();
     }
 
     async function fetchOpenAI(prompt) {
-      const label = useCouncil ? 'Council: OpenAI (Skeptical Architect)' : 'OpenAI ChatGPT';
-      const ui = createEngineBlock(label);
+      const label = 'OpenAI gpt-4o-mini';
+      const ui = createEngineBlock(useCouncil ? `Council -> ${label}` : label);
       try {
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        const targetUrl = 'https://api.openai.com/v1/chat/completions';
+        const res = await fetch(corsProxy + encodeURIComponent(targetUrl), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.openai}` },
+          headers: { 
+            'Content-Type': 'application/json', 
+            'Authorization': `Bearer ${keys.openai}` 
+          },
           body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] })
         });
         const data = await res.json();
         ui.content.innerText = data.choices[0].message.content;
         ui.header.children[1].className = "text-green-400 text-[9px]";
-        ui.header.children[1].innerText = "🟢 COMPLETADO";
+        ui.header.children[1].innerText = "🟢 NODO ONLINE";
       } catch (err) {
-        ui.content.innerText = 'Fallo en la comunicación de OpenAI.';
+        ui.content.innerText = 'Fallo de autenticación o respuesta en nodo OpenAI GPT.';
+        ui.header.children[1].className = "text-red-500 text-[9px]";
+        ui.header.children[1].innerText = "🔴 ERROR";
       }
       autoScroll();
     }
 
     async function fetchOpenRouter(prompt) {
-      const label = useCouncil ? 'Council: OpenRouter (Context Summary)' : 'OpenRouter Llama 3';
-      const ui = createEngineBlock(label);
+      const label = 'OpenRouter Llama 3';
+      const ui = createEngineBlock(useCouncil ? `Council -> ${label}` : label);
       try {
-        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        const targetUrl = 'https://openrouter.ai/api/v1/chat/completions';
+        const res = await fetch(corsProxy + encodeURIComponent(targetUrl), {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json', 
-            'Authorization': `Bearer ${keys.openrouter}`,
-            'HTTP-Referer': window.location.href,
-            'X-Title': 'Omhnibus'
+            'Authorization': `Bearer ${keys.openrouter}`
           },
-          body: JSON.stringify({ model: 'meta-llama/llama-3-8b-instruct:free', messages: [{ role: 'user', content: prompt }] })
+          body: JSON.stringify({ 
+            model: 'meta-llama/llama-3-8b-instruct:free', 
+            messages: [{ role: 'user', content: prompt }] 
+          })
         });
         const data = await res.json();
-        ui.content.innerText = data.choices[0].message.content || JSON.stringify(data);
+        ui.content.innerText = data.choices[0].message.content;
         ui.header.children[1].className = "text-green-400 text-[9px]";
-        ui.header.children[1].innerText = "🟢 COMPLETADO";
+        ui.header.children[1].innerText = "🟢 NODO ONLINE";
       } catch (err) {
-        ui.content.innerText = 'Fallo en la comunicación de OpenRouter.';
+        ui.content.innerText = 'Límitación de cuota free o error de parseo en OpenRouter.';
+        ui.header.children[1].className = "text-red-500 text-[9px]";
+        ui.header.children[1].innerText = "🔴 ERROR";
       }
       autoScroll();
     }
 
     async function fetchGroq(prompt) {
-      const label = useCouncil ? 'Council: Groq (Security Auditor)' : 'Groq Llama 3.1';
-      const ui = createEngineBlock(label);
+      const label = 'Groq Llama 3.3 70B';
+      const ui = createEngineBlock(useCouncil ? `Council -> ${label}` : label);
       try {
-        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        const targetUrl = 'https://api.groq.com/openai/v1/chat/completions';
+        const res = await fetch(corsProxy + encodeURIComponent(targetUrl), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.groq}` },
-          body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: [{ role: 'user', content: prompt }] })
+          headers: { 
+            'Content-Type': 'application/json', 
+            'Authorization': `Bearer ${keys.groq}` 
+          },
+          body: JSON.stringify({ 
+            model: 'llama-3.3-70b-versatile', 
+            messages: [{ role: 'user', content: prompt }] 
+          })
         });
         const data = await res.json();
-        ui.content.innerText = data.choices[0].message.content || JSON.stringify(data);
+        ui.content.innerText = data.choices[0].message.content;
         ui.header.children[1].className = "text-green-400 text-[9px]";
-        ui.header.children[1].innerText = "🟢 COMPLETADO";
+        ui.header.children[1].innerText = "🟢 NODO ONLINE";
       } catch (err) {
-        ui.content.innerText = 'Fallo en la comunicación de Groq.';
+        ui.content.innerText = 'Fallo de comunicación en nodo Groq Cloud (Verifica tu API Key).';
+        ui.header.children[1].className = "text-red-500 text-[9px]";
+        ui.header.children[1].innerText = "🔴 ERROR";
       }
       autoScroll();
     }
