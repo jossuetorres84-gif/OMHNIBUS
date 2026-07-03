@@ -1,47 +1,243 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>ÓMHNIBUS Táctil Avanzado</title>
     <style>
-        body { margin: 0; background: #0b132b; color: white; font-family: sans-serif; overflow: hidden; height: 100vh; }
-        .node { position: absolute; width: 80px; height: 80px; background: #3a86ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; touch-action: none; border: 3px solid white; z-index: 10; font-size: 12px; }
-        .del-btn { position: absolute; top: -5px; right: -5px; background: red; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+        body { margin: 0; background: #0b132b; color: white; font-family: sans-serif; overflow: hidden; height: 100vh; user-select: none; -webkit-user-select: none; }
+        #canvas { position: absolute; width: 100%; height: 100%; top: 0; left: 0; }
+        
+        /* Estilos base del Nodo */
+        .node { position: absolute; width: 85px; height: 85px; background: #1c2541; border: 3px solid #3a86ff; display: flex; align-items: center; justify-content: center; touch-action: none; z-index: 10; font-size: 11px; font-weight: bold; text-align: center; padding: 5px; box-sizing: border-box; transition: transform 0.1s ease, border-radius 0.2s ease, background-color 0.2s ease; }
+        
+        /* Formas Geométricas */
+        .shape-circle { border-radius: 50%; }
+        .shape-square { border-radius: 12px; }
+        .shape-triangle { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); background: #222e50; height: 95px; }
+        
+        .node-active { transform: scale(1.08); border-color: #5a9eff; box-shadow: 0 0 15px rgba(58, 134, 255, 0.6); }
+        .node-connecting { border-color: #ffbe0b !important; box-shadow: 0 0 15px rgba(255, 190, 11, 0.6); }
+
+        /* Menú Contextual Flotante Táctil */
+        .context-menu { position: absolute; background: rgba(11, 19, 43, 0.95); border: 1px solid #3a86ff; border-radius: 16px; padding: 8px; display: none; flex-direction: column; gap: 6px; z-index: 100; box-shadow: 0 10px 25px rgba(0,0,0,0.7); backdrop-filter: blur(5px); }
+        .context-menu button { background: #1c2541; color: white; border: 1px solid #3a86ff/40; padding: 8px 14px; border-radius: 8px; font-size: 11px; font-weight: bold; text-align: left; min-width: 120px; }
+        .context-menu button:active { background: #3a86ff; }
+        .context-menu .btn-del { border-color: #ff006e; color: #ff006e; }
+        .context-menu .btn-del:active { background: #ff006e; color: white; }
+
+        /* Capa de Conexiones SVG */
+        svg { position: absolute; width: 100%; height: 100%; top: 0; left: 0; pointer-events: none; z-index: 1; }
+        line { stroke: #3a86ff; stroke-width: 3; stroke-linecap: round; }
     </style>
 </head>
-<body id="canvas">
-    <div style="padding: 10px; pointer-events: none;">Doble toque para crear. Mantén presionado para mover.</div>
-    <script>
-        let lastTap = 0;
-        document.getElementById('canvas').addEventListener('touchend', (e) => {
-            let now = new Date().getTime();
-            if(now - lastTap < 300 && e.target.id === 'canvas') {
-                let n = document.createElement('div');
-                n.className = 'node';
-                n.innerText = 'Nodo';
-                
-                // Botón de eliminar individual
-                let d = document.createElement('div');
-                d.className = 'del-btn';
-                d.innerText = 'x';
-                d.ontouchstart = (ev) => { ev.stopPropagation(); n.remove(); };
-                n.appendChild(d);
+<body>
 
-                n.style.left = (e.changedTouches[0].pageX - 40) + 'px';
-                n.style.top = (e.changedTouches[0].pageY - 40) + 'px';
-                
-                let isDragging = false;
-                n.ontouchstart = (ev) => { if(ev.target !== d) isDragging = true; };
-                window.ontouchmove = (ev) => {
-                    if(isDragging) {
-                        n.style.left = (ev.touches[0].pageX - 40) + 'px';
-                        n.style.top = (ev.touches[0].pageY - 40) + 'px';
-                    }
-                };
-                window.ontouchend = () => isDragging = false;
-                document.body.appendChild(n);
+    <div style="position: fixed; top: 15px; left: 15px; z-index: 50; font-size: 12px; color: #6c757d; pointer-events: none;">
+        📱 Doble toque: Crear | Arrastrar: Mover | Mantener presionado: Menú de Opciones
+    </div>
+
+    <div id="canvas">
+        <svg id="svg-connections"></svg>
+    </div>
+
+    <!-- Menú de Opciones Único -->
+    <div id="menu-contextual" class="context-menu">
+        <button id="menu-text">✏️ Editar Nombre</button>
+        <button id="menu-connect">🔗 Conectar A...</button>
+        <button id="menu-shape">📐 Cambiar Forma</button>
+        <button id="menu-del" class="btn-del">🗑️ Eliminar</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const svg = document.getElementById('svg-connections');
+        const menu = document.getElementById('menu-contextual');
+
+        let nodes = [];
+        let connections = [];
+        let nodeCount = 0;
+        let lastTap = 0;
+        
+        let nodeTargetSelected = null; // Nodo bajo edición
+        let connectionSource = null;   // Nodo origen para enlaces
+
+        // --- GESTIÓN DEL LIENZO (CREAR NODOS) ---
+        canvas.addEventListener('touchend', (e) => {
+            if (e.target !== canvas && e.target.id !== 'svg-connections') return;
+            
+            let now = new Date().getTime();
+            if (now - lastTap < 300) {
+                let touch = e.changedTouches[0];
+                createNode(touch.pageX, touch.pageY);
             }
             lastTap = now;
+            ocultarMenu();
         });
+
+        function createNode(x, y) {
+            nodeCount++;
+            const id = 'node_' + Date.now();
+            
+            const n = document.createElement('div');
+            n.id = id;
+            n.className = 'node shape-circle';
+            n.innerText = 'Nodo ' + nodeCount;
+            n.style.left = (x - 42) + 'px';
+            n.style.top = (y - 42) + 'px';
+
+            const nodeObj = { id, element: n, x: x, y: y, shape: 'circle' };
+            nodes.push(nodeObj);
+
+            // --- EVENTOS TÁCTILES DEL NODO (ARRASTRAR / LONG PRESS) ---
+            let isDragging = false;
+            let pressTimer = null;
+
+            n.addEventListener('touchstart', (ev) => {
+                ev.stopPropagation();
+                if (connectionSource) return; // Bloquear arrastre si estamos enlazando
+
+                n.classList.add('node-active');
+                
+                // Temporizador para detectar Presión Larga (Long Press)
+                pressTimer = setTimeout(() => {
+                    isDragging = false;
+                    n.classList.remove('node-active');
+                    abrirMenu(nodeObj, ev.touches[0].pageX, ev.touches[0].pageY);
+                }, 500); 
+
+                isDragging = true;
+            });
+
+            n.addEventListener('touchmove', (ev) => {
+                if (!isDragging) return;
+                clearTimeout(pressTimer); // Si mueve el dedo, cancela la presión larga
+
+                let touch = ev.touches[0];
+                nodeObj.x = touch.pageX;
+                nodeObj.y = touch.pageY;
+                
+                n.style.left = (touch.pageX - 42) + 'px';
+                n.style.top = (touch.pageY - 42) + 'px';
+
+                actualizarLineas();
+            });
+
+            n.addEventListener('touchend', () => {
+                clearTimeout(pressTimer);
+                isDragging = false;
+                n.classList.remove('node-active');
+                
+                // Si estábamos esperando el objetivo de una conexión
+                if (connectionSource && connectionSource !== nodeObj) {
+                    crearEnlace(connectionSource, nodeObj);
+                    finalizarConexion();
+                }
+            });
+
+            canvas.appendChild(n);
+            actualizarLineas();
+        }
+
+        // --- SISTEMA DEL MENÚ CONTEXTUAL ---
+        function abrirMenu(nodeObj, x, y) {
+            nodeTargetSelected = nodeObj;
+            menu.style.display = 'flex';
+            menu.style.left = Math.min(x, window.innerWidth - 150) + 'px';
+            menu.style.top = Math.min(y, window.innerHeight - 180) + 'px';
+        }
+
+        function ocultarMenu() {
+            menu.style.display = 'none';
+        }
+
+        // Acción: Eliminar
+        document.getElementById('menu-del').addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            if (!nodeTargetSelected) return;
+
+            // Limpiar conexiones asociadas
+            connections = connections.filter(c => c.source !== nodeTargetSelected && c.target !== nodeTargetSelected);
+            nodeTargetSelected.element.remove();
+            nodes = nodes.filter(n => n.id !== nodeTargetSelected.id);
+            
+            actualizarLineas();
+            ocultarMenu();
+        });
+
+        // Acción: Cambiar Forma
+        document.getElementById('menu-shape').addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            if (!nodeTargetSelected) return;
+
+            const el = nodeTargetSelected.element;
+            if (nodeTargetSelected.shape === 'circle') {
+                el.classList.replace('shape-circle', 'shape-square');
+                nodeTargetSelected.shape = 'square';
+            } else if (nodeTargetSelected.shape === 'square') {
+                el.classList.replace('shape-square', 'shape-triangle');
+                nodeTargetSelected.shape = 'triangle';
+            } else {
+                el.classList.replace('shape-triangle', 'shape-circle');
+                nodeTargetSelected.shape = 'circle';
+            }
+            ocultarMenu();
+        });
+
+        // Acción: Editar Nombre (Prompt Táctil Nativo)
+        document.getElementById('menu-text').addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            ocultarMenu();
+            setTimeout(() => {
+                let nuevoNombre = prompt("Introduce el nuevo nombre del nodo:", nodeTargetSelected.element.innerText);
+                if (nuevoNombre !== null && nuevoNombre.trim() !== "") {
+                    nodeTargetSelected.element.innerText = nuevoNombre;
+                }
+            }, 100);
+        });
+
+        // Acción: Iniciar Enlace/Conexión
+        document.getElementById('menu-connect').addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            connectionSource = nodeTargetSelected;
+            connectionSource.element.classList.add('node-connecting');
+            ocultarMenu();
+        });
+
+        function finalizarConexion() {
+            if (connectionSource) {
+                connectionSource.element.classList.remove('node-connecting');
+            }
+            connectionSource = null;
+        }
+
+        // Cancelar estados si se toca el fondo
+        canvas.addEventListener('touchstart', () => {
+            finalizarConexion();
+            ocultarMenu();
+        });
+
+        // --- SISTEMA DE CONEXIONES (SVG) ---
+        function crearEnlace(src, tgt) {
+            // Prevenir duplicados
+            let existe = connections.some(c => (c.source.id === src.id && c.target.id === tgt.id) || (c.source.id === tgt.id && c.target.id === src.id));
+            if (!existe) {
+                connections.push({ source: src, target: tgt });
+                actualizarLineas();
+            }
+        }
+
+        function actualizarLineas() {
+            svg.innerHTML = '';
+            connections.forEach(c => {
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', c.source.x);
+                line.setAttribute('y1', c.source.y);
+                line.setAttribute('x2', c.target.x);
+                line.setAttribute('y2', c.target.y);
+                svg.appendChild(line);
+            });
+        }
     </script>
 </body>
 </html>
