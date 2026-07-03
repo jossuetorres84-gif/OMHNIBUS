@@ -22,7 +22,6 @@
       <div class="space-y-2 text-xs">
         <div><label class="text-slate-400">Google Gemini Key:</label><input type="password" id="key-gemini" placeholder="AIzaSy..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none"></div>
         <div><label class="text-slate-400">OpenAI GPT Key:</label><input type="password" id="key-openai" placeholder="sk-..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none"></div>
-        <div><label class="text-slate-400">OpenRouter Key:</label><input type="password" id="key-openrouter" placeholder="sk-or-..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none"></div>
         <div><label class="text-slate-400">Groq Key:</label><input type="password" id="key-groq" placeholder="gsk_..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none"></div>
       </div>
       <button onclick="saveAllKeys()" class="w-full bg-teal-600 hover:bg-teal-500 text-white py-2 rounded-lg text-xs font-semibold">Fijar Llaves</button>
@@ -49,12 +48,14 @@
     const keys = {
       gemini: localStorage.getItem('_om_key_gemini') || '',
       openai: localStorage.getItem('_om_key_openai') || '',
-      openrouter: localStorage.getItem('_om_key_openrouter') || '',
       groq: localStorage.getItem('_om_key_groq') || ''
     };
 
-    // EL CAMBIO MAESTRO:
     const corsProxy = "https://corsproxy.io/?";
+
+    document.getElementById('key-gemini').value = keys.gemini;
+    document.getElementById('key-openai').value = keys.openai;
+    document.getElementById('key-groq').value = keys.groq;
 
     function toggleKeyManager() {
       const isHidden = document.getElementById('key-manager').classList.toggle('hidden');
@@ -64,7 +65,6 @@
     function saveAllKeys() {
       localStorage.setItem('_om_key_gemini', document.getElementById('key-gemini').value.trim());
       localStorage.setItem('_om_key_openai', document.getElementById('key-openai').value.trim());
-      localStorage.setItem('_om_key_openrouter', document.getElementById('key-openrouter').value.trim());
       localStorage.setItem('_om_key_groq', document.getElementById('key-groq').value.trim());
       location.reload();
     }
@@ -72,12 +72,52 @@
     let useCouncil = false;
     document.getElementById('council-toggle-btn').addEventListener('click', () => {
       useCouncil = !useCouncil;
-      document.getElementById('council-indicator').classList.toggle('bg-amber-400');
-      document.getElementById('council-btn-text').innerText = useCouncil ? 'ÓMHNIBUS COUNCIL: ACTIVO' : 'ÓMHNIBUS COUNCIL: DESACTIVADO';
+      const indicator = document.getElementById('council-indicator');
+      const text = document.getElementById('council-btn-text');
+      
+      if(useCouncil) {
+        indicator.className = "w-2 h-2 rounded-full bg-amber-400 animate-pulse";
+        text.innerText = 'ÓMHNIBUS COUNCIL: MODO SECUENCIAL ACTIVO';
+        text.className = 'text-amber-400 font-semibold';
+      } else {
+        indicator.className = "w-2 h-2 rounded-full bg-slate-500";
+        text.innerText = 'ÓMHNIBUS COUNCIL: DESACTIVADO';
+        text.className = 'text-slate-400';
+      }
     });
 
+    function createEngineBlock(name) {
+      const div = document.createElement('div');
+      div.className = 'p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs space-y-1 my-1 max-w-[90%] self-start w-full shadow-md';
+      div.innerHTML = `
+        <div class="flex justify-between items-center border-b border-slate-800 pb-1">
+          <span class="font-bold text-teal-400">🤖 ${name}</span>
+          <span class="text-[9px] text-amber-400 animate-pulse font-mono tracking-wider">CONECTANDO...</span>
+        </div>
+        <div class="mt-1 text-slate-300 whitespace-pre-wrap leading-relaxed">Procesando transmisión de datos crudos...</div>`;
+      document.getElementById('messages-container').appendChild(div);
+      
+      const screen = document.getElementById('chat-screen');
+      screen.scrollTop = screen.scrollHeight;
+      
+      return { 
+        content: div.children[1], 
+        status: div.children[0].children[1] 
+      };
+    }
+
+    function appendUserMessage(text) {
+      const container = document.getElementById('messages-container');
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'p-3 rounded-2xl max-w-[85%] bg-teal-600 text-white ml-auto whitespace-pre-wrap text-sm shadow-md my-1 self-end';
+      msgDiv.innerText = text;
+      container.appendChild(msgDiv);
+    }
+
+    // --- PROCESAMIENTO UNO POR UNO (ASYNC/AWAIT DIRECTO) ---
+
     async function fetchGemini(prompt) {
-      const ui = createEngineBlock('Gemini Flash');
+      const ui = createEngineBlock('Gemini 1.5 Flash');
       try {
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${keys.gemini}`, {
           method: 'POST',
@@ -86,52 +126,73 @@
         });
         const data = await res.json();
         ui.content.innerText = data.candidates[0].content.parts[0].text;
-      } catch { ui.content.innerText = "Error en Nodo Gemini"; }
+        ui.status.innerText = "🟢 NODO ONLINE";
+        ui.status.className = "text-[9px] text-green-400 font-mono";
+      } catch (err) { 
+        ui.content.innerText = "Error crítico de lectura en Nodo Gemini."; 
+        ui.status.innerText = "🔴 ERROR";
+        ui.status.className = "text-[9px] text-red-500 font-mono";
+      }
     }
 
     async function fetchOpenAI(prompt) {
       const ui = createEngineBlock('OpenAI GPT-4o-mini');
       try {
-        const res = await fetch(corsProxy + encodeURIComponent('https://api.openai.com/v1/chat/completions'), {
+        const targetUrl = 'https://api.openai.com/v1/chat/completions';
+        const res = await fetch(corsProxy + encodeURIComponent(targetUrl), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.openai}` },
           body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] })
         });
         const data = await res.json();
         ui.content.innerText = data.choices[0].message.content;
-      } catch { ui.content.innerText = "Error de autenticación OpenAI"; }
+        ui.status.innerText = "🟢 NODO ONLINE";
+        ui.status.className = "text-[9px] text-green-400 font-mono";
+      } catch (err) { 
+        ui.content.innerText = "Fallo de autenticación en canal OpenAI."; 
+        ui.status.innerText = "🔴 ERROR";
+        ui.status.className = "text-[9px] text-red-500 font-mono";
+      }
     }
 
     async function fetchGroq(prompt) {
-      const ui = createEngineBlock('Groq Llama 3.3');
+      const ui = createEngineBlock('Groq Llama 3.3 70B');
       try {
-        const res = await fetch(corsProxy + encodeURIComponent('https://api.groq.com/openai/v1/chat/completions'), {
+        const targetUrl = 'https://api.groq.com/openai/v1/chat/completions';
+        const res = await fetch(corsProxy + encodeURIComponent(targetUrl), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.groq}` },
           body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }] })
         });
         const data = await res.json();
         ui.content.innerText = data.choices[0].message.content;
-      } catch { ui.content.innerText = "Error en Nodo Groq"; }
+        ui.status.innerText = "🟢 NODO ONLINE";
+        ui.status.className = "text-[9px] text-green-400 font-mono";
+      } catch (err) { 
+        ui.content.innerText = "Límite de solicitudes o llave inválida en Groq."; 
+        ui.status.innerText = "🔴 ERROR";
+        ui.status.className = "text-[9px] text-red-500 font-mono";
+      }
     }
 
-    function createEngineBlock(name) {
-      const div = document.createElement('div');
-      div.className = 'p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs';
-      div.innerHTML = `<div class='font-bold text-teal-400'>${name}</div><div class='mt-1 text-slate-300'>Cargando...</div>`;
-      document.getElementById('messages-container').appendChild(div);
-      return { content: div.children[1] };
-    }
+    // EL CONTROLADOR DE FLUJO SECUENCIAL
+    document.getElementById('launch-btn').onclick = async () => {
+      const inputEl = document.getElementById('user-input');
+      const prompt = inputEl.value.trim();
+      if (!prompt) return;
 
-    document.getElementById('launch-btn').onclick = () => {
-      const p = document.getElementById('user-input').value;
-      if (!p) return;
+      inputEl.value = '';
+      document.getElementById('empty-notice').classList.add('hidden');
+      appendUserMessage(prompt);
+
       if (useCouncil) {
-        if (keys.gemini) fetchGemini(p);
-        if (keys.openai) fetchOpenAI(p);
-        if (keys.groq) fetchGroq(p);
+        // Ejecución ordenada una detrás de otra usando await
+        if (keys.gemini) await fetchGemini(prompt);
+        if (keys.openai) await fetchOpenAI(prompt);
+        if (keys.groq)   await fetchGroq(prompt);
       } else {
-        fetchGemini(p);
+        if (keys.gemini) await fetchGemini(prompt);
+        else alert("Configura tu Google Gemini Key.");
       }
     };
   </script>
