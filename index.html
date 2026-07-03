@@ -265,6 +265,69 @@ Generad una única respuesta técnica unificada de nivel Senior: ${prompt}`;
         ui.header.children[1].innerText = '🔴 ERROR';
       }
     }
+    // --- NUEVO ENRUTADOR INTELIGENTE Y DETALLE DE MODELOS ---
+async function sendPromptAll() {
+  const inputEl = document.getElementById('user-input');
+  const prompt = inputEl.value.trim();
+  if (!prompt) return;
+
+  if (!keys.gemini && !keys.openai && !keys.openrouter && !keys.groq) {
+    alert('Por favor, ingresa y guarda al menos una clave API para iniciar.');
+    toggleKeyManager();
+    return;
+  }
+
+  inputEl.value = '';
+  document.getElementById('empty-notice').classList.add('hidden');
+  appendUserMessage(prompt);
+
+  let finalPrompt = prompt;
+  if (useCouncil) {
+    finalPrompt = `Actúas como un Consejo de Expertos en IA (ÓmhnibusCouncil). Debatid internamente la siguiente solicitud desde los roles de Skeptical Architect, Security Auditor y Performance Expert. Generad una única respuesta técnica unificada de nivel Senior: ${prompt}`;
+  }
+
+  const isCoding = /código|programar|script|función|html|css|js|java|python|json/i.test(prompt);
+  const isComplex = prompt.length > 120 || /analiza|resume|debate|explica|comparar|audita/i.test(prompt);
+
+  if (isCoding && keys.openai) { fetchOpenAI(finalPrompt); } 
+  else if (isComplex && keys.gemini) { fetchGemini(finalPrompt); } 
+  else if (keys.openrouter) { fetchOpenRouter(finalPrompt); }
+
+  if (keys.groq) { fetchGroq(finalPrompt); }
+}
+
+async function fetchOpenRouter(prompt) {
+  const ui = createEngineBlock('OpenRouter / Buscando Modelo...');
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.openrouter}` },
+      body: JSON.stringify({ model: 'meta-llama/llama-3-8b-instruct:free', messages: [{ role: 'user', content: prompt }] })
+    });
+    const data = await res.json();
+    ui.header.innerHTML = `<span>🤖 MODELO: Llama 3 8B Instruct (Open Source vía OpenRouter)</span> <span class="text-green-400 text-[10px] font-mono">🟢 ONLINE</span>`;
+    ui.content.innerText = data.choices[0].message.content;
+  } catch (err) {
+    ui.content.innerText = 'Error en OpenRouter.';
+  }
+}
+
+async function fetchGroq(prompt) {
+  const ui = createEngineBlock('Groq / Buscando Nodo...');
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.groq}` },
+      body: JSON.stringify({ model: 'llama3-8b-8192', messages: [{ role: 'user', content: prompt }] })
+    });
+    const data = await res.json();
+    ui.header.innerHTML = `<span>🤖 MODELO: Llama 3 8B Hardware-Accelerated (Open Source vía Groq)</span> <span class="text-green-400 text-[10px] font-mono">🟢 ONLINE</span>`;
+    ui.content.innerText = data.choices[0].message.content;
+  } catch (err) {
+    ui.content.innerText = 'Error en Groq.';
+  }
+}
+
   </script>
 </body>
 </html>
