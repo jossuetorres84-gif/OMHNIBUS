@@ -46,17 +46,7 @@
     </footer>
   </div>
 
-  <script type="importmap">
-    {
-      "imports": {
-        "@google/generative-ai": "https://esm.run/@google/generative-ai"
-      }
-    }
-  </script>
-
-  <script type="module">
-    import { GoogleGenAI } from '@google/generative-ai';
-
+  <script>
     const keys = {
       gemini: localStorage.getItem('_om_key_gemini') || '',
       openai: localStorage.getItem('_om_key_openai') || '',
@@ -71,14 +61,14 @@
     document.getElementById('key-openrouter').value = keys.openrouter;
     document.getElementById('key-groq').value = keys.groq;
     
-    document.getElementById('debug-keys').innerText = `Nodos activos: Gemini (${keys.gemini?'OK':'NO'}) | OpenAI (${keys.openai?'OK':'NO'}) | OpenRouter (${keys.openrouter?'OK':'NO'})`;
+    document.getElementById('debug-keys').innerText = `Nodos: Gemini (${keys.gemini?'SI':'NO'}) | OpenRouter (${keys.openrouter?'SI':'NO'})`;
 
-    window.toggleKeyManager = function() {
+    function toggleKeyManager() {
       const isHidden = document.getElementById('key-manager').classList.toggle('hidden');
       document.getElementById('chat-screen').classList.toggle('hidden', !isHidden);
     }
 
-    window.saveAllKeys = function() {
+    function saveAllKeys() {
       localStorage.setItem('_om_key_gemini', document.getElementById('key-gemini').value.trim());
       localStorage.setItem('_om_key_openai', document.getElementById('key-openai').value.trim());
       localStorage.setItem('_om_key_openrouter', document.getElementById('key-openrouter').value.trim());
@@ -128,22 +118,30 @@
       container.appendChild(msgDiv);
     }
 
-    // LLAMADA MEDIANTE EL SDK INYECTADO PARA ASEGURAR INTEGRIDAD
+    // PETICIÓN DIRECTA CORREGIDA CON EL CUERPO ESTÁNDAR PARA V1
     async function fetchGemini(prompt) {
       const ui = createEngineBlock('Gemini 1.5 Flash');
       if (!keys.gemini) { ui.content.innerText = "Falta llave de Gemini."; ui.status.innerText = "⚠️ VACÍO"; return; }
       try {
-        const ai = new GoogleGenAI({ apiKey: keys.gemini });
-        const response = await ai.models.generateContent({
-          model: 'gemini-1.5-flash',
-          contents: prompt,
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${keys.gemini}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }]
+          })
         });
-        ui.content.innerText = response.text;
-        ui.status.innerText = "🟢 NODO ONLINE";
-        ui.status.className = "text-[9px] text-green-400 font-mono";
+        const data = await res.json();
+        if(data.candidates && data.candidates[0].content.parts[0].text) {
+          ui.content.innerText = data.candidates[0].content.parts[0].text;
+          ui.status.innerText = "🟢 NODO ONLINE";
+          ui.status.className = "text-[9px] text-green-400 font-mono";
+        } else {
+          ui.content.innerText = "Respuesta inesperada de Google: " + JSON.stringify(data);
+          ui.status.innerText = "🔴 ADVERTENCIA";
+        }
       } catch (err) { 
-        ui.content.innerText = "Error en enlace SDK. Verifica si las restricciones de IP de tu API Key en Google Cloud están bloqueando Vercel."; 
-        ui.status.innerText = "🔴 ERROR INTERNO";
+        ui.content.innerText = "Error de red directo con el endpoint estable de Gemini."; 
+        ui.status.innerText = "🔴 ERROR";
         ui.status.className = "text-[9px] text-red-500 font-mono";
       }
     }
@@ -162,9 +160,8 @@
         ui.status.innerText = "🟢 NODO ONLINE";
         ui.status.className = "text-[9px] text-green-400 font-mono";
       } catch (err) { 
-        ui.content.innerText = "Error de origen cruzado en OpenAI."; 
+        ui.content.innerText = "Error en canal cifrado OpenAI via Proxy."; 
         ui.status.innerText = "🔴 ERROR";
-        ui.status.className = "text-[9px] text-red-500 font-mono";
       }
     }
 
@@ -176,8 +173,7 @@
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json', 
-            'Authorization': `Bearer ${keys.openrouter}`,
-            'HTTP-Referer': window.location.origin
+            'Authorization': `Bearer ${keys.openrouter}`
           },
           body: JSON.stringify({ model: 'meta-llama/llama-3-8b-instruct:free', messages: [{ role: 'user', content: prompt }] })
         });
@@ -186,9 +182,8 @@
         ui.status.innerText = "🟢 NODO ONLINE";
         ui.status.className = "text-[9px] text-green-400 font-mono";
       } catch (err) { 
-        ui.content.innerText = "Fallo en la comunicación con OpenRouter."; 
+        ui.content.innerText = "Error de respuesta en OpenRouter."; 
         ui.status.innerText = "🔴 ERROR";
-        ui.status.className = "text-[9px] text-red-500 font-mono";
       }
     }
 
@@ -206,9 +201,8 @@
         ui.status.innerText = "🟢 NODO ONLINE";
         ui.status.className = "text-[9px] text-green-400 font-mono";
       } catch (err) { 
-        ui.content.innerText = "Error en Groq Node."; 
+        ui.content.innerText = "Error de pasarela en Groq cloud."; 
         ui.status.innerText = "🔴 ERROR";
-        ui.status.className = "text-[9px] text-red-500 font-mono";
       }
     }
 
