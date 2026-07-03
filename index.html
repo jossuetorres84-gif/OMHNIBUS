@@ -118,12 +118,12 @@
       container.appendChild(msgDiv);
     }
 
-    // PETICIÓN DIRECTA CORREGIDA CON EL CUERPO ESTÁNDAR PARA V1
+    // RESOLUCIÓN DEL ERROR 404: Se apunta a gemini-1.5-flash-latest
     async function fetchGemini(prompt) {
       const ui = createEngineBlock('Gemini 1.5 Flash');
       if (!keys.gemini) { ui.content.innerText = "Falta llave de Gemini."; ui.status.innerText = "⚠️ VACÍO"; return; }
       try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${keys.gemini}`, {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${keys.gemini}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -160,7 +160,7 @@
         ui.status.innerText = "🟢 NODO ONLINE";
         ui.status.className = "text-[9px] text-green-400 font-mono";
       } catch (err) { 
-        ui.content.innerText = "Error en canal cifrado OpenAI via Proxy."; 
+        ui.content.innerText = "Error en canal OpenAI."; 
         ui.status.innerText = "🔴 ERROR";
       }
     }
@@ -171,10 +171,7 @@
       try {
         const res = await fetch(corsProxy + encodeURIComponent('https://openrouter.ai/api/v1/chat/completions'), {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json', 
-            'Authorization': `Bearer ${keys.openrouter}`
-          },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.openrouter}` },
           body: JSON.stringify({ model: 'meta-llama/llama-3-8b-instruct:free', messages: [{ role: 'user', content: prompt }] })
         });
         const data = await res.json();
@@ -182,7 +179,7 @@
         ui.status.innerText = "🟢 NODO ONLINE";
         ui.status.className = "text-[9px] text-green-400 font-mono";
       } catch (err) { 
-        ui.content.innerText = "Error de respuesta en OpenRouter."; 
+        ui.content.innerText = "Error en OpenRouter."; 
         ui.status.innerText = "🔴 ERROR";
       }
     }
@@ -201,7 +198,7 @@
         ui.status.innerText = "🟢 NODO ONLINE";
         ui.status.className = "text-[9px] text-green-400 font-mono";
       } catch (err) { 
-        ui.content.innerText = "Error de pasarela en Groq cloud."; 
+        ui.content.innerText = "Error en Groq."; 
         ui.status.innerText = "🔴 ERROR";
       }
     }
