@@ -3,12 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ÓMHNIBUS - Canvas Inteligente</title>
+    <title>ÓMHNIBUS - Lienzo UI Avanzado</title>
     <style>
+        /* Variables dinámicas controladas por JS */
         :root {
             --bg-color: #090d16;
             --grid-color: rgba(58, 134, 255, 0.08);
+            --node-bg: rgba(28, 37, 65, 0.75);
+            --node-text: #e2e8f0;
+            --node-border: rgba(90, 158, 255, 0.4);
             --grid-size: 30px;
+            
+            /* UI Controls Theme */
+            --ui-bg: rgba(9, 13, 22, 0.9);
+            --ui-border: rgba(58, 134, 255, 0.3);
+            --ui-text: #cbd5e1;
         }
 
         body, html {
@@ -21,6 +30,7 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             user-select: none;
             -webkit-user-select: none;
+            transition: background-color 0.3s ease;
         }
 
         #viewport {
@@ -60,6 +70,74 @@
             stroke-linecap: round;
         }
 
+        /* --- BARRA DE AJUSTES SUPERIOR FIJA --- */
+        .top-settings-bar {
+            position: fixed;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            background: var(--ui-bg);
+            border: 1px solid var(--ui-border);
+            border-radius: 30px;
+            padding: 6px 18px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .settings-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            color: var(--ui-text);
+            font-weight: 600;
+        }
+
+        .top-settings-bar button {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: var(--ui-text);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .top-settings-bar button:active {
+            background: #3a86ff;
+            color: #ffffff;
+        }
+
+        .color-picker-wrapper {
+            position: relative;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .color-picker-wrapper input[type="color"] {
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            width: 30px;
+            height: 30px;
+            border: none;
+            background: none;
+            cursor: pointer;
+        }
+
+        /* --- CONFIGURACIÓN DE NODOS --- */
         .node-container {
             position: absolute;
             display: flex;
@@ -72,21 +150,21 @@
         .node-body {
             width: 100%;
             height: 100%;
-            background: rgba(28, 37, 65, 0.75);
-            border: 2px solid rgba(90, 158, 255, 0.4);
+            background: var(--node-bg);
+            border: 2px solid var(--node-border);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
             display: flex;
             align-items: center;
             justify-content: center;
             box-sizing: border-box;
-            color: #e2e8f0;
+            color: var(--node-text);
             font-size: 12px;
-            font-weight: 500;
+            font-weight: 600;
             text-align: center;
             padding: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-            transition: border-color 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            transition: background-color 0.2s, color 0.2s;
         }
 
         /* Formas Geométricas */
@@ -98,15 +176,15 @@
         .shape-rhombus { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
 
         .container-selected .node-body {
-            border-color: #3a86ff;
+            border-color: #3a86ff !important;
             box-shadow: 0 0 25px rgba(58, 134, 255, 0.5);
         }
         .node-connecting .node-body {
-            border-color: #ffbe0b;
+            border-color: #ffbe0b !important;
             box-shadow: 0 0 25px rgba(255, 190, 11, 0.6);
         }
 
-        /* Manejadores Visuales */
+        /* Manejadores de Miro */
         .handle {
             position: absolute;
             display: none;
@@ -116,7 +194,7 @@
             border: 2px solid #ffffff;
             border-radius: 50%;
             z-index: 50;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
             touch-action: none;
             align-items: center;
             justify-content: center;
@@ -140,58 +218,60 @@
         }
         .container-selected::before { display: block; }
 
-        /* Menús Contextuales */
+        /* Menús emergentes planos y rápidos */
         .context-menu {
             position: absolute;
-            background: rgba(9, 13, 22, 0.95);
-            border: 1px solid rgba(58, 134, 255, 0.3);
+            background: var(--ui-bg);
+            border: 1px solid var(--ui-border);
             border-radius: 14px;
             padding: 6px;
             display: none;
             flex-direction: column;
             gap: 4px;
             z-index: 100;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             backdrop-filter: blur(10px);
         }
 
         .context-menu button {
             background: transparent;
-            color: #cbd5e1;
+            color: var(--ui-text);
             border: none;
             padding: 10px 16px;
             border-radius: 8px;
             font-size: 12px;
             font-weight: 600;
             text-align: left;
-            min-width: 150px;
-            touch-action: none;
+            min-width: 155px;
+            cursor: pointer;
         }
 
         .context-menu button:active { background: rgba(58, 134, 255, 0.2); color: #3a86ff; }
         .context-menu .btn-del { color: #ff006e; }
         .context-menu .btn-del:active { background: rgba(255, 0, 110, 0.2); }
-
-        .hud {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            z-index: 50;
-            font-size: 11px;
-            color: #64748b;
-            pointer-events: none;
-            background: rgba(9, 13, 22, 0.6);
-            padding: 8px 14px;
-            border-radius: 20px;
-            backdrop-filter: blur(4px);
-            border: 1px solid rgba(255,255,255,0.05);
-        }
     </style>
 </head>
 <body>
 
-    <div class="hud">
-        🌌 ÓMHNIBUS Core | 🔘 Doble Toque Fondo: Crear | 🔘 Doble Toque Figura: Editar Texto | 🎯 Mantener: Menú
+    <!-- BARRA DE AJUSTES FIJA SUPERIOR -->
+    <div class="top-settings-bar">
+        <div class="settings-group">
+            <span>Modo:</span>
+            <button id="toggle-theme-btn">🌙 Oscuro</button>
+        </div>
+        <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.15);"></div>
+        <div class="settings-group">
+            <span>🎨 Fondo:</span>
+            <div class="color-picker-wrapper" id="bg-wrapper">
+                <input type="color" id="picker-bg" value="#090d16">
+            </div>
+        </div>
+        <div class="settings-group">
+            <span>💎 Nodos:</span>
+            <div class="color-picker-wrapper" id="node-wrapper">
+                <input type="color" id="picker-node" value="#1c2541">
+            </div>
+        </div>
     </div>
 
     <div id="viewport">
@@ -200,19 +280,21 @@
         </div>
     </div>
 
+    <!-- Menú Contextual Simple -->
     <div id="menu-contextual" class="context-menu">
         <button id="menu-connect">🔗 Conectar A...</button>
         <button id="menu-shape-trigger">💎 Cambiar Forma ➔</button>
         <button id="menu-del" class="btn-del">🗑️ Eliminar Nodo</button>
     </div>
 
+    <!-- Submenú de Formas Geométricas -->
     <div id="menu-formas" class="context-menu">
-        <button onclick="setShape('circle')">🔘 Círculo</button>
-        <button onclick="setShape('square')">⬛ Cuadrado</button>
-        <button onclick="setShape('triangle')">🔺 Triángulo</button>
-        <button onclick="setShape('pentagon')">⬠ Pentágono</button>
-        <button onclick="setShape('hexagon')">⬢ Hexágono</button>
-        <button onclick="setShape('rhombus')">🔷 Rombo</button>
+        <button id="shape-circle">🔘 Círculo</button>
+        <button id="shape-square">⬛ Cuadrado</button>
+        <button id="shape-triangle">🔺 Triángulo</button>
+        <button id="shape-pentagon">⬠ Pentágono</button>
+        <button id="shape-hexagon">⬢ Hexágono</button>
+        <button id="shape-rhombus">🔷 Rombo</button>
     </div>
 
     <script>
@@ -221,6 +303,13 @@
         const svg = document.getElementById('svg-connections');
         const menu = document.getElementById('menu-contextual');
         const menuFormas = document.getElementById('menu-formas');
+        
+        // Elementos de la barra superior
+        const toggleThemeBtn = document.getElementById('toggle-theme-btn');
+        const pickerBg = document.getElementById('picker-bg');
+        const pickerNode = document.getElementById('picker-node');
+        const bgWrapper = document.getElementById('bg-wrapper');
+        const nodeWrapper = document.getElementById('node-wrapper');
 
         let scale = 1;
         let panX = window.innerWidth / 2 - 5000;
@@ -241,12 +330,58 @@
         let nodeTargetSelected = null;
         let connectionSource = null;
 
+        // --- SISTEMA DE TEMAS Y PERSONALIZACIÓN DE COLORES ---
+        let currentMode = 'dark'; // 'dark' o 'light'
+        
+        const themes = {
+            dark: { bg: '#090d16', node: '#1c2541', text: '#e2e8f0', border: 'rgba(90, 158, 255, 0.4)', grid: 'rgba(58, 134, 255, 0.08)', uiBg: 'rgba(9, 13, 22, 0.9)', uiText: '#cbd5e1' },
+            light: { bg: '#f8fafc', node: '#ffffff', text: '#0f172a', border: 'rgba(15, 23, 42, 0.15)', grid: 'rgba(15, 23, 42, 0.04)', uiBg: 'rgba(255, 255, 255, 0.95)', uiText: '#334155' }
+        };
+
+        function updateThemeStyles() {
+            const theme = themes[currentMode];
+            document.documentElement.style.setProperty('--bg-color', theme.bg);
+            document.documentElement.style.setProperty('--node-bg', theme.node);
+            document.documentElement.style.setProperty('--node-text', theme.text);
+            document.documentElement.style.setProperty('--node-border', theme.border);
+            document.documentElement.style.setProperty('--grid-color', theme.grid);
+            document.documentElement.style.setProperty('--ui-bg', theme.uiBg);
+            document.documentElement.style.setProperty('--ui-text', theme.uiText);
+            
+            // Sincronizar Pickers Visuales
+            pickerBg.value = theme.bg;
+            pickerNode.value = theme.node;
+            bgWrapper.style.backgroundColor = theme.bg;
+            nodeWrapper.style.backgroundColor = theme.node;
+            
+            toggleThemeBtn.innerText = currentMode === 'dark' ? '🌙 Oscuro' : '☀️ Claro';
+        }
+
+        toggleThemeBtn.addEventListener('click', () => {
+            currentMode = currentMode === 'dark' ? 'light' : 'dark';
+            updateThemeStyles();
+        });
+
+        pickerBg.addEventListener('input', (e) => {
+            themes[currentMode].bg = e.target.value;
+            bgWrapper.style.backgroundColor = e.target.value;
+            document.documentElement.style.setProperty('--bg-color', e.target.value);
+        });
+
+        pickerNode.addEventListener('input', (e) => {
+            themes[currentMode].node = e.target.value;
+            nodeWrapper.style.backgroundColor = e.target.value;
+            document.documentElement.style.setProperty('--node-bg', e.target.value);
+        });
+
+        updateThemeStyles();
+
         function applyTransform() {
             canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
         }
         applyTransform();
 
-        // Control de fondo vacío
+        // Control del Canvas Vacío
         viewport.addEventListener('touchstart', (e) => {
             ocultarMenu();
             if (e.target === viewport || e.target === canvas || e.target.id === 'svg-connections') {
@@ -303,7 +438,7 @@
             }
         });
 
-        // --- SISTEMA DE CREACIÓN DE NODOS ---
+        // --- SISTEMA DE ENTRADA E INTERACCIÓN DE NODOS ---
         function createNode(x, y) {
             nodeCount++;
             
@@ -343,32 +478,31 @@
             updateNodeStyle();
 
             let isDragging = false;
-            let pressTimer = null;
-            let lastNodeTap = 0; // Rastreo específico de doble toque en la figura
+            let startDragX = 0, startDragY = 0;
+            let lastNodeTap = 0;
 
+            // RESPUESTA INSTANTÁNEA AL CLIC/TOQUE SIMPLE
             body.addEventListener('touchstart', (ev) => {
                 ev.stopPropagation();
                 ocultarMenu();
                 
                 let now = Date.now();
                 
-                // DETECCIÓN DE DOBLE TOQUE DIRECTO PARA EDITAR TEXTO
-                if (now - lastNodeTap < 300) {
-                    clearTimeout(pressTimer);
+                // Doble Toque Rápido -> Editar Texto Directo
+                if (now - lastNodeTap < 260) {
                     isDragging = false;
-                    
                     setTimeout(() => {
                         let nuevoTexto = prompt("Modificar contenido del nodo:", body.innerText);
                         if (nuevoTexto !== null && nuevoTexto.trim() !== "") {
                             body.innerText = nuevoTexto;
                         }
                     }, 50);
-                    
                     lastNodeTap = now;
                     return;
                 }
                 lastNodeTap = now;
 
+                // Toque Simple Instantáneo -> Seleccionar y abrir menú automáticamente
                 nodes.forEach(n => n.container.classList.remove('container-selected'));
                 container.classList.add('container-selected');
 
@@ -378,32 +512,29 @@
                     return;
                 }
 
-                pressTimer = setTimeout(() => {
-                    isDragging = false;
-                    abrirMenu(nodeObj, ev.touches[0].clientX, ev.touches[0].clientY);
-                }, 550);
+                // Desplegar menú de inmediato al hacer clic en lugar de esperar presión larga
+                abrirMenu(nodeObj, ev.touches[0].clientX, ev.touches[0].clientY);
 
                 isDragging = true;
+                startDragX = (ev.touches[0].clientX / scale) - nodeObj.x;
+                startDragY = (ev.touches[0].clientY / scale) - nodeObj.y;
             });
 
             body.addEventListener('touchmove', (ev) => {
                 if (!isDragging) return;
-                clearTimeout(pressTimer);
+                ocultarMenu(); // Ocultar menús si se empieza a arrastrar el nodo
 
                 let touch = ev.touches[0];
-                nodeObj.x = (touch.clientX - panX) / scale;
-                nodeObj.y = (touch.clientY - panY) / scale;
+                nodeObj.x = (touch.clientX / scale) - startDragX;
+                nodeObj.y = (touch.clientY / scale) - startDragY;
                 
                 updateNodeStyle();
                 actualizarLineas();
             });
 
-            body.addEventListener('touchend', () => {
-                clearTimeout(pressTimer);
-                isDragging = false;
-            });
+            body.addEventListener('touchend', () => { isDragging = false; });
 
-            // Manejador de tamaño
+            // Manejador del Tamaño (Arrastre continuo)
             let isResizing = false;
             let startW = 0, startH = 0, startTouchX = 0, startTouchY = 0;
 
@@ -430,7 +561,7 @@
 
             window.addEventListener('touchend', () => { isResizing = false; });
 
-            // Manejador de rotación
+            // Manejador de Rotación (Ángulo continuo)
             let isRotating = false;
             handleRotate.addEventListener('touchstart', (ev) => {
                 ev.stopPropagation();
@@ -454,12 +585,12 @@
             actualizarLineas();
         }
 
-        // --- MENÚ CONTEXTUAL ---
+        // --- SISTEMA DE MENÚS (EVENTOS DE ACCIÓN RÁPIDA) ---
         function abrirMenu(nodeObj, clientX, clientY) {
             nodeTargetSelected = nodeObj;
             menu.style.display = 'flex';
             menu.style.left = Math.min(clientX, window.innerWidth - 170) + 'px';
-            menu.style.top = Math.min(clientY, window.innerHeight - 220) + 'px';
+            menu.style.top = Math.min(clientY, window.innerHeight - 200) + 'px';
         }
 
         function ocultarMenu() { 
@@ -467,30 +598,41 @@
             menuFormas.style.display = 'none';
         }
 
-        document.getElementById('menu-shape-trigger').addEventListener('touchstart', (e) => {
+        // Clic en Desplegar formas -> Inmediato
+        document.getElementById('menu-shape-trigger').addEventListener('click', (e) => {
             e.stopPropagation();
             menuFormas.style.display = 'flex';
-            menuFormas.style.left = (parseFloat(menu.style.left) + 40) + 'px';
-            menuFormas.style.top = (parseFloat(menu.style.top) + 40) + 'px';
+            menuFormas.style.left = (parseFloat(menu.style.left) + 45) + 'px';
+            menuFormas.style.top = (parseFloat(menu.style.top) + 30) + 'px';
         });
 
-        function setShape(newShape) {
-            if (!nodeTargetSelected) return;
-            const b = nodeTargetSelected.body;
-            b.className = 'node-body';
-            b.classList.add('shape-' + newShape);
-            nodeTargetSelected.shape = newShape;
-            ocultarMenu();
+        function bindShapeBtn(id, shapeName) {
+            document.getElementById(id).addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!nodeTargetSelected) return;
+                const b = nodeTargetSelected.body;
+                b.className = 'node-body';
+                b.classList.add('shape-' + shapeName);
+                nodeTargetSelected.shape = shapeName;
+                ocultarMenu();
+            });
         }
 
-        document.getElementById('menu-connect').addEventListener('touchstart', (e) => {
+        bindShapeBtn('shape-circle', 'circle');
+        bindShapeBtn('shape-square', 'square');
+        bindShapeBtn('shape-triangle', 'triangle');
+        bindShapeBtn('shape-pentagon', 'pentagon');
+        bindShapeBtn('shape-hexagon', 'hexagon');
+        bindShapeBtn('shape-rhombus', 'rhombus');
+
+        document.getElementById('menu-connect').addEventListener('click', (e) => {
             e.stopPropagation();
             connectionSource = nodeTargetSelected;
             connectionSource.container.classList.add('node-connecting');
             ocultarMenu();
         });
 
-        document.getElementById('menu-del').addEventListener('touchstart', (e) => {
+        document.getElementById('menu-del').addEventListener('click', (e) => {
             e.stopPropagation();
             if (!nodeTargetSelected) return;
             connections = connections.filter(c => c.source !== nodeTargetSelected && c.target !== nodeTargetSelected);
@@ -527,5 +669,3 @@
     </script>
 </body>
 </html>
-
-
