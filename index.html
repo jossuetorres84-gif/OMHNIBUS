@@ -42,7 +42,7 @@
     <!-- Lienzo de Chat Concurrente -->
     <main id="chat-screen" class="flex-1 overflow-y-auto my-4 space-y-4 pr-1 text-sm">
       <div id="empty-notice" class="text-center text-slate-600 mt-20 text-xs">
-        Ecosistema síncrono activo. Configura tus llaves y lanza una instrucción para ejecutar todas las IAs en paralelo.
+        Ecosistema síncrono activo. Configura tus llaves y lanza una instrucción para ejecutar el enrutamiento inteligente.
       </div>
       <div id="messages-container" class="space-y-4"></div>
     </main>
@@ -73,13 +73,11 @@
       groq: localStorage.getItem('_om_key_groq') || ''
     };
 
-    // Cargar valores iniciales si existen
     document.getElementById('key-gemini').value = keys.gemini;
     document.getElementById('key-openai').value = keys.openai;
     document.getElementById('key-openrouter').value = keys.openrouter;
     document.getElementById('key-groq').value = keys.groq;
 
-    // Forzar apertura inicial si el almacenamiento local está vacío
     if (!keys.gemini && !keys.openai && !keys.openrouter && !keys.groq) {
       toggleKeyManager();
     }
@@ -111,7 +109,6 @@
       document.getElementById('chat-screen').classList.remove('hidden');
     }
 
-    // El resto de funciones auxiliares permanecen idénticas para asegurar consistencia táctil
     function toggleCouncil() {
       useCouncil = !useCouncil;
       const btn = document.getElementById('council-btn');
@@ -172,15 +169,24 @@
 
       let finalPrompt = prompt;
       if (useCouncil) {
-        finalPrompt = `Actúas como un Consejo de Expertos en IA (ÓmhnibusCouncil). 
-Debatid internamente la siguiente solicitud desde los roles de Skeptical Architect, Security Auditor y Performance Expert.
-Generad una única respuesta técnica unificada de nivel Senior: ${prompt}`;
+        finalPrompt = `Actúas como un Consejo de Expertos en IA (ÓmhnibusCouncil). Debatid internamente la siguiente solicitud desde los roles de Skeptical Architect, Security Auditor y Performance Expert. Generad una única respuesta técnica unificada de nivel Senior: ${prompt}`;
       }
 
-      if (keys.gemini) fetchGemini(finalPrompt);
-      if (keys.openai) fetchOpenAI(finalPrompt);
-      if (keys.openrouter) fetchOpenRouter(finalPrompt);
-      if (keys.groq) fetchGroq(finalPrompt);
+      // --- ENRUTAMIENTO INTELIGENTE ---
+      const isCoding = /código|programar|script|función|html|css|js|java|python|json/i.test(prompt);
+      const isComplex = prompt.length > 120 || /analiza|resume|debate|explica|comparar|audita/i.test(prompt);
+
+      if (isCoding && keys.openai) { 
+        fetchOpenAI(finalPrompt); 
+      } else if (isComplex && keys.gemini) { 
+        fetchGemini(finalPrompt); 
+      } else if (keys.openrouter) { 
+        fetchOpenRouter(finalPrompt); 
+      }
+
+      if (keys.groq) { 
+        fetchGroq(finalPrompt); 
+      }
     }
 
     async function fetchGemini(prompt) {
@@ -196,7 +202,7 @@ Generad una única respuesta técnica unificada de nivel Senior: ${prompt}`;
         ui.header.children[1].className = 'text-green-400 text-[10px] font-mono';
         ui.header.children[1].innerText = '🟢 ONLINE';
       } catch (err) {
-        ui.content.innerText = 'Error en Gemini Cloud. Revisa el estado de la clave.';
+        ui.content.innerText = 'Error en Gemini Cloud.';
         ui.header.children[1].className = 'text-red-500 text-[10px] font-mono';
         ui.header.children[1].innerText = '🔴 ERROR';
       }
@@ -215,40 +221,32 @@ Generad una única respuesta técnica unificada de nivel Senior: ${prompt}`;
         ui.header.children[1].className = 'text-green-400 text-[10px] font-mono';
         ui.header.children[1].innerText = '🟢 ONLINE';
       } catch (err) {
-        ui.content.innerText = 'Error en OpenAI. Requiere saldo activo.';
+        ui.content.innerText = 'Error en OpenAI.';
         ui.header.children[1].className = 'text-red-500 text-[10px] font-mono';
         ui.header.children[1].innerText = '🔴 ERROR';
       }
     }
 
     async function fetchOpenRouter(prompt) {
-      const ui = createEngineBlock('OpenRouter / Claude-Free');
+      const ui = createEngineBlock('OpenRouter / Buscando Modelo...');
       try {
-        // Apunta directamente a OpenRouter usando un modelo Pro libre por defecto (auto-mapeado sin costo)
         const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json', 
-            'Authorization': `Bearer ${keys.openrouter}`
-          },
-          body: JSON.stringify({ 
-            model: 'meta-llama/llama-3-8b-instruct:free', 
-            messages: [{ role: 'user', content: prompt }] 
-          })
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.openrouter}` },
+          body: JSON.stringify({ model: 'meta-llama/llama-3-8b-instruct:free', messages: [{ role: 'user', content: prompt }] })
         });
         const data = await res.json();
+        ui.header.innerHTML = `<span>🤖 MODELO: Llama 3 8B Instruct (Open Source vía OpenRouter)</span> <span class="text-green-400 text-[10px] font-mono">🟢 ONLINE</span>`;
         ui.content.innerText = data.choices[0].message.content;
-        ui.header.children[1].className = 'text-green-400 text-[10px] font-mono';
-        ui.header.children[1].innerText = '🟢 ONLINE';
       } catch (err) {
-        ui.content.innerText = 'Error en OpenRouter. Comprueba que tu clave (sk-or-v1-...) esté copiada completa.';
+        ui.content.innerText = 'Error en OpenRouter.';
         ui.header.children[1].className = 'text-red-500 text-[10px] font-mono';
         ui.header.children[1].innerText = '🔴 ERROR';
       }
     }
 
     async function fetchGroq(prompt) {
-      const ui = createEngineBlock('Groq / Open Source');
+      const ui = createEngineBlock('Groq / Buscando Nodo...');
       try {
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
@@ -256,78 +254,14 @@ Generad una única respuesta técnica unificada de nivel Senior: ${prompt}`;
           body: JSON.stringify({ model: 'llama3-8b-8192', messages: [{ role: 'user', content: prompt }] })
         });
         const data = await res.json();
+        ui.header.innerHTML = `<span>🤖 MODELO: Llama 3 8B Hardware-Accelerated (Open Source vía Groq)</span> <span class="text-green-400 text-[10px] font-mono">🟢 ONLINE</span>`;
         ui.content.innerText = data.choices[0].message.content;
-        ui.header.children[1].className = 'text-green-400 text-[10px] font-mono';
-        ui.header.children[1].innerText = '🟢 ONLINE';
       } catch (err) {
-        ui.content.innerText = 'Error en Groq Cloud.';
+        ui.content.innerText = 'Error en Groq.';
         ui.header.children[1].className = 'text-red-500 text-[10px] font-mono';
         ui.header.children[1].innerText = '🔴 ERROR';
       }
     }
-    // --- NUEVO ENRUTADOR INTELIGENTE Y DETALLE DE MODELOS ---
-async function sendPromptAll() {
-  const inputEl = document.getElementById('user-input');
-  const prompt = inputEl.value.trim();
-  if (!prompt) return;
-
-  if (!keys.gemini && !keys.openai && !keys.openrouter && !keys.groq) {
-    alert('Por favor, ingresa y guarda al menos una clave API para iniciar.');
-    toggleKeyManager();
-    return;
-  }
-
-  inputEl.value = '';
-  document.getElementById('empty-notice').classList.add('hidden');
-  appendUserMessage(prompt);
-
-  let finalPrompt = prompt;
-  if (useCouncil) {
-    finalPrompt = `Actúas como un Consejo de Expertos en IA (ÓmhnibusCouncil). Debatid internamente la siguiente solicitud desde los roles de Skeptical Architect, Security Auditor y Performance Expert. Generad una única respuesta técnica unificada de nivel Senior: ${prompt}`;
-  }
-
-  const isCoding = /código|programar|script|función|html|css|js|java|python|json/i.test(prompt);
-  const isComplex = prompt.length > 120 || /analiza|resume|debate|explica|comparar|audita/i.test(prompt);
-
-  if (isCoding && keys.openai) { fetchOpenAI(finalPrompt); } 
-  else if (isComplex && keys.gemini) { fetchGemini(finalPrompt); } 
-  else if (keys.openrouter) { fetchOpenRouter(finalPrompt); }
-
-  if (keys.groq) { fetchGroq(finalPrompt); }
-}
-
-async function fetchOpenRouter(prompt) {
-  const ui = createEngineBlock('OpenRouter / Buscando Modelo...');
-  try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.openrouter}` },
-      body: JSON.stringify({ model: 'meta-llama/llama-3-8b-instruct:free', messages: [{ role: 'user', content: prompt }] })
-    });
-    const data = await res.json();
-    ui.header.innerHTML = `<span>🤖 MODELO: Llama 3 8B Instruct (Open Source vía OpenRouter)</span> <span class="text-green-400 text-[10px] font-mono">🟢 ONLINE</span>`;
-    ui.content.innerText = data.choices[0].message.content;
-  } catch (err) {
-    ui.content.innerText = 'Error en OpenRouter.';
-  }
-}
-
-async function fetchGroq(prompt) {
-  const ui = createEngineBlock('Groq / Buscando Nodo...');
-  try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.groq}` },
-      body: JSON.stringify({ model: 'llama3-8b-8192', messages: [{ role: 'user', content: prompt }] })
-    });
-    const data = await res.json();
-    ui.header.innerHTML = `<span>🤖 MODELO: Llama 3 8B Hardware-Accelerated (Open Source vía Groq)</span> <span class="text-green-400 text-[10px] font-mono">🟢 ONLINE</span>`;
-    ui.content.innerText = data.choices[0].message.content;
-  } catch (err) {
-    ui.content.innerText = 'Error en Groq.';
-  }
-}
-
   </script>
 </body>
 </html>
