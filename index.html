@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ÓMHNIBUS - Lienzo Infinito Estable</title>
+    <title>ÓMHNIBUS - Canvas Geométrico</title>
     <style>
         :root {
             --bg-color: #090d16;
@@ -37,7 +37,7 @@
             height: 10000px;
             left: 0;
             top: 0;
-            transform-origin: 0 0; /* Origen en esquina para control matricial preciso */
+            transform-origin: 0 0;
             background-image: 
                 linear-gradient(var(--grid-color) 1px, transparent 1px),
                 linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
@@ -60,10 +60,9 @@
             stroke-linecap: round;
         }
 
+        /* Estructura Base Dinámica del Nodo */
         .node {
             position: absolute;
-            width: 110px;
-            height: 110px;
             background: rgba(28, 37, 65, 0.75);
             border: 2px solid rgba(90, 158, 255, 0.4);
             backdrop-filter: blur(8px);
@@ -80,16 +79,21 @@
             padding: 8px;
             box-sizing: border-box;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-            transition: transform 0.1s ease, border-radius 0.2s ease, border-color 0.2s ease;
+            transition: transform 0.1s ease, border-color 0.2s ease;
         }
 
-        .shape-circle { border-radius: 50%; }
-        .shape-square { border-radius: 14px; }
-        .shape-triangle { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); padding-top: 25px; height: 120px; }
+        /* Diccionario Geométrico Avanzado */
+        .shape-circle { border-radius: 50%; clip-path: none; }
+        .shape-square { border-radius: 14px; clip-path: none; }
+        .shape-triangle { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); padding-top: 20px; }
+        .shape-pentagon { clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%); padding-top: 10px; }
+        .shape-hexagon { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); }
+        .shape-rhombus { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
 
         .node-active { transform: scale(1.05); border-color: #3a86ff; box-shadow: 0 0 20px rgba(58, 134, 255, 0.4); }
         .node-connecting { border-color: #ffbe0b; box-shadow: 0 0 20px rgba(255, 190, 11, 0.5); }
 
+        /* Menús de Interfaz Flotante */
         .context-menu {
             position: absolute;
             background: rgba(9, 13, 22, 0.95);
@@ -113,7 +117,7 @@
             font-size: 12px;
             font-weight: 600;
             text-align: left;
-            min-width: 140px;
+            min-width: 150px;
             touch-action: none;
         }
 
@@ -140,7 +144,7 @@
 <body>
 
     <div class="hud">
-        🌌 Paneo: 1 Dedo | 📱 Zoom Fijo: 2 Dedos | 🔘 Doble Toque: Crear | 🎯 Presión Larga: Menú
+        🌌 Paneo: 1 Dedo | 📱 Zoom Fijo: 2 Dedos | 🔘 Doble Toque: Crear | 🎯 Presión Larga: Opciones
     </div>
 
     <div id="viewport">
@@ -149,11 +153,23 @@
         </div>
     </div>
 
+    <!-- Menú Contextual Principal -->
     <div id="menu-contextual" class="context-menu">
         <button id="menu-text">✏️ Editar Texto</button>
         <button id="menu-connect">🔗 Conectar A...</button>
-        <button id="menu-shape">📐 Cambiar Forma</button>
+        <button id="menu-size">📐 Cambiar Tamaño</button>
+        <button id="menu-shape-trigger">💎 Cambiar Forma ➔</button>
         <button id="menu-del" class="btn-del">🗑️ Eliminar Nodo</button>
+    </div>
+
+    <!-- Submenú Selectivo de Formas Geométricas -->
+    <div id="menu-formas" class="context-menu">
+        <button onclick="setShape('circle')">🔘 Círculo</button>
+        <button onclick="setShape('square')">⬛ Cuadrado</button>
+        <button onclick="setShape('triangle')">🔺 Triángulo</button>
+        <button onclick="setShape('pentagon')">⬠ Pentágono</button>
+        <button onclick="setShape('hexagon')">⬢ Hexágono</button>
+        <button onclick="setShape('rhombus')">🔷 Rombo</button>
     </div>
 
     <script>
@@ -161,8 +177,8 @@
         const canvas = document.getElementById('infinite-canvas');
         const svg = document.getElementById('svg-connections');
         const menu = document.getElementById('menu-contextual');
+        const menuFormas = document.getElementById('menu-formas');
 
-        // Inicializamos centrados en el lienzo de 10k x 10k
         let scale = 1;
         let panX = window.innerWidth / 2 - 5000;
         let panY = window.innerHeight / 2 - 5000;
@@ -173,7 +189,6 @@
         let initScale = 1;
         let lastTap = 0;
         
-        // Bloqueadores de seguridad táctil
         let zoomActive = false;
         let blockTime = 0;
 
@@ -188,25 +203,20 @@
         }
         applyTransform();
 
-        // --- SISTEMA DE ZOOM Y PANEO AVANZADO ---
+        // --- MANEJO DE ZOOM Y PANEO DE REJILLA ---
         viewport.addEventListener('touchstart', (e) => {
             ocultarMenu();
             if (e.target !== viewport && e.target !== canvas && e.target.id !== 'svg-connections') return;
 
             if (e.touches.length === 1) {
-                if (Date.now() - blockTime < 300) return; // Bloqueo anti-rebote post-zoom
+                if (Date.now() - blockTime < 300) return;
                 isPanningCanvas = true;
                 startPanX = e.touches[0].clientX - panX;
                 startPanY = e.touches[0].clientY - panY;
             } else if (e.touches.length === 2) {
                 isPanningCanvas = false;
                 zoomActive = true;
-                
-                // Distancia inicial entre dos dedos
-                initPinchDist = Math.hypot(
-                    e.touches[0].clientX - e.touches[1].clientX,
-                    e.touches[0].clientY - e.touches[1].clientY
-                );
+                initPinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
                 initScale = scale;
             }
         });
@@ -217,54 +227,38 @@
                 panY = e.touches[0].clientY - startPanY;
                 applyTransform();
             } else if (zoomActive && e.touches.length === 2) {
-                // 1. Encontrar punto medio del pinch en pantalla global
                 const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
                 const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-
-                // 2. Convertir ese punto a la posición matemática dentro del lienzo antes del zoom
                 const canvasX = (midX - panX) / scale;
                 const canvasY = (midY - panY) / scale;
-
-                // 3. Calcular la nueva escala
-                const dist = Math.hypot(
-                    e.touches[0].clientX - e.touches[1].clientX,
-                    e.touches[0].clientY - e.touches[1].clientY
-                );
-                const prevScale = scale;
+                const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
                 scale = Math.min(Math.max(initScale * (dist / initPinchDist), 0.25), 2.5);
-
-                // 4. Ajustar el desplazamiento (Pan) para mantener el punto focal fijo bajo los dedos
                 panX = midX - canvasX * scale;
                 panY = midY - canvasY * scale;
-
                 applyTransform();
             }
         });
 
         viewport.addEventListener('touchend', (e) => {
             isPanningCanvas = false;
-            
             if (e.touches.length === 0 && zoomActive) {
                 zoomActive = false;
-                blockTime = Date.now(); // Guardar estampa de tiempo al soltar el zoom
+                blockTime = Date.now();
             }
 
             if (e.target === viewport || e.target === canvas || e.target.id === 'svg-connections') {
                 let now = Date.now();
-                
-                // CONDICIÓN: No crear nodos si se usó zoom recientemente o si hay dedos activos
                 if (now - lastTap < 300 && !zoomActive && (now - blockTime > 400)) {
                     let touch = e.changedTouches[0];
                     const xOnCanvas = (touch.clientX - panX) / scale;
                     const yOnCanvas = (touch.clientY - panY) / scale;
-
                     createNode(xOnCanvas, yOnCanvas);
                 }
                 lastTap = now;
             }
         });
 
-        // --- SISTEMA DE NODOS ---
+        // --- GESTIÓN DE NODOS DINÁMICOS ---
         function createNode(x, y) {
             nodeCount++;
             const id = 'node_' + Date.now();
@@ -273,10 +267,15 @@
             n.id = id;
             n.className = 'node shape-circle';
             n.innerText = 'Nodo ' + nodeCount;
-            n.style.left = (x - 55) + 'px';
-            n.style.top = (y - 55) + 'px';
+            
+            // Atributos de dimensión inicial por defecto
+            const defaultSize = 110;
+            n.style.width = defaultSize + 'px';
+            n.style.height = defaultSize + 'px';
+            n.style.left = (x - defaultSize / 2) + 'px';
+            n.style.top = (y - defaultSize / 2) + 'px';
 
-            const nodeObj = { id, element: n, x: x, y: y, shape: 'circle' };
+            const nodeObj = { id, element: n, x: x, y: y, size: defaultSize, shape: 'circle' };
             nodes.push(nodeObj);
 
             let isDraggingNode = false;
@@ -307,8 +306,8 @@
 
                 nodeObj.x = currentX;
                 nodeObj.y = currentY;
-                n.style.left = (currentX - 55) + 'px';
-                n.style.top = (currentY - 55) + 'px';
+                n.style.left = (currentX - nodeObj.size / 2) + 'px';
+                n.style.top = (currentY - nodeObj.size / 2) + 'px';
 
                 actualizarLineas();
             });
@@ -328,41 +327,57 @@
             actualizarLineas();
         }
 
-        // --- INTERFAZ MENÚ CONTEXTUAL ---
+        // --- SISTEMA DE CONTROL DE MENÚS ---
         function abrirMenu(nodeObj, clientX, clientY) {
             nodeTargetSelected = nodeObj;
             menu.style.display = 'flex';
-            menu.style.left = Math.min(clientX, window.innerWidth - 160) + 'px';
-            menu.style.top = Math.min(clientY, window.innerHeight - 200) + 'px';
+            menu.style.left = Math.min(clientX, window.innerWidth - 170) + 'px';
+            menu.style.top = Math.min(clientY, window.innerHeight - 220) + 'px';
         }
 
-        function ocultarMenu() { menu.style.display = 'none'; }
+        function ocultarMenu() { 
+            menu.style.display = 'none'; 
+            menuFormas.style.display = 'none';
+        }
 
-        document.getElementById('menu-del').addEventListener('touchstart', (e) => {
+        // Submenú: Desplegar selección geométrica
+        document.getElementById('menu-shape-trigger').addEventListener('touchstart', (e) => {
             e.stopPropagation();
-            if (!nodeTargetSelected) return;
-            connections = connections.filter(c => c.source !== nodeTargetSelected && c.target !== nodeTargetSelected);
-            nodeTargetSelected.element.remove();
-            nodes = nodes.filter(n => n.id !== nodeTargetSelected.id);
-            actualizarLineas();
-            ocultarMenu();
+            menuFormas.style.display = 'flex';
+            menuFormas.style.left = (parseFloat(menu.style.left) + 40) + 'px';
+            menuFormas.style.top = (parseFloat(menu.style.top) + 40) + 'px';
         });
 
-        document.getElementById('menu-shape').addEventListener('touchstart', (e) => {
-            e.stopPropagation();
+        function setShape(newShape) {
             if (!nodeTargetSelected) return;
             const el = nodeTargetSelected.element;
-            if (nodeTargetSelected.shape === 'circle') {
-                el.classList.replace('shape-circle', 'shape-square');
-                nodeTargetSelected.shape = 'square';
-            } else if (nodeTargetSelected.shape === 'square') {
-                el.classList.replace('shape-square', 'shape-triangle');
-                nodeTargetSelected.shape = 'triangle';
-            } else {
-                el.classList.replace('shape-triangle', 'shape-circle');
-                nodeTargetSelected.shape = 'circle';
-            }
+            
+            // Remover formas previas
+            el.classList.remove('shape-circle', 'shape-square', 'shape-triangle', 'shape-pentagon', 'shape-hexagon', 'shape-rhombus');
+            // Inyectar nueva geometría asignada
+            el.classList.add('shape-' + newShape);
+            nodeTargetSelected.shape = newShape;
             ocultarMenu();
+        }
+
+        // Configuración de Dimensión (Modificable manualmente)
+        document.getElementById('menu-size').addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            ocultarMenu();
+            setTimeout(() => {
+                let nuevoTamano = prompt("Asigna el tamaño en píxeles (Ej. 80 a 200):", nodeTargetSelected.size);
+                let parseSize = parseInt(nuevoTamano);
+                if (!isNaN(parseSize) && parseSize >= 40 && parseSize <= 400) {
+                    nodeTargetSelected.size = parseSize;
+                    nodeTargetSelected.element.style.width = parseSize + 'px';
+                    nodeTargetSelected.element.style.height = parseSize + 'px';
+                    
+                    // Reposicionar caja según nuevas dimensiones centrales
+                    nodeTargetSelected.element.style.left = (nodeTargetSelected.x - parseSize / 2) + 'px';
+                    nodeTargetSelected.element.style.top = (nodeTargetSelected.y - parseSize / 2) + 'px';
+                    actualizarLineas();
+                }
+            }, 100);
         });
 
         document.getElementById('menu-text').addEventListener('touchstart', (e) => {
@@ -380,6 +395,16 @@
             e.stopPropagation();
             connectionSource = nodeTargetSelected;
             connectionSource.element.classList.add('node-connecting');
+            ocultarMenu();
+        });
+
+        document.getElementById('menu-del').addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            if (!nodeTargetSelected) return;
+            connections = connections.filter(c => c.source !== nodeTargetSelected && c.target !== nodeTargetSelected);
+            nodeTargetSelected.element.remove();
+            nodes = nodes.filter(n => n.id !== nodeTargetSelected.id);
+            actualizarLineas();
             ocultarMenu();
         });
 
@@ -410,5 +435,3 @@
     </script>
 </body>
 </html>
-
-  
