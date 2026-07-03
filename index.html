@@ -20,7 +20,7 @@
       <h3 class="text-sm font-semibold text-center text-teal-400">Panel de Conectores Cloud</h3>
       <div class="space-y-2 text-xs">
         <div>
-          <label class="text-slate-400">Google Gemini Key:</label>
+          <label class="text-slate-400">Google Gemini Key (Soporta Búsqueda Web):</label>
           <input type="password" id="key-gemini" placeholder="AIzaSy..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none">
         </div>
         <div>
@@ -42,7 +42,7 @@
     <!-- Lienzo de Chat Concurrente -->
     <main id="chat-screen" class="flex-1 overflow-y-auto my-4 space-y-4 pr-1 text-sm">
       <div id="empty-notice" class="text-center text-slate-600 mt-20 text-xs">
-        Ecosistema listo. Escribe tu mensaje abajo y presiona Lanzar.
+        Ecosistema listo. Usa palabras clave como "busca", "noticias" o "actualidad" para activar el rastreo en red en tiempo real.
       </div>
       <div id="messages-container" class="space-y-4"></div>
     </main>
@@ -122,7 +122,7 @@
       
       const content = document.createElement('div');
       content.className = 'text-slate-200 whitespace-pre-wrap pt-1';
-      content.innerText = 'Esperando respuesta de la API...';
+      content.innerText = 'Esperando respuesta...';
       
       block.appendChild(header);
       block.appendChild(content);
@@ -130,7 +130,7 @@
       return { content, header };
     }
 
-    // Vinculación directa y limpia del botón de envío para evitar fallos táctiles
+    // Vinculación del evento Lanzar
     document.getElementById('launch-btn').addEventListener('click', () => {
       const inputEl = document.getElementById('user-input');
       const prompt = inputEl.value.trim();
@@ -140,44 +140,71 @@
       document.getElementById('empty-notice').classList.add('hidden');
       appendUserMessage(prompt);
 
-      // --- ENRUTADOR INTELIGENTE AUTOMÁTICO ---
+      // --- ENRUTAMIENTO INTELIGENTE AMPLIADO PARA RED TIEMPO REAL ---
+      const isSearchRequest = /busca|internet|red|tiempo real|noticias|actual|hoy|clima|precio/i.test(prompt);
       const isCoding = /código|programar|script|función|html|css|js|java|python|json/i.test(prompt);
       const isComplex = prompt.length > 120 || /analiza|resume|debate|explica|comparar|audita/i.test(prompt);
 
-      if (isCoding && keys.openai) { 
+      // Regla prioritaria: Si solicita explícitamente datos en tiempo real de internet, forzar Gemini Cloud con Web Grounding
+      if (isSearchRequest && keys.gemini) {
+        fetchGemini(prompt, true);
+      } else if (isCoding && keys.openai) { 
         fetchOpenAI(prompt); 
       } else if (isComplex && keys.gemini) { 
-        fetchGemini(prompt); 
+        fetchGemini(prompt, false); 
       } else if (keys.openrouter) { 
         fetchOpenRouter(prompt); 
       }
 
+      // Groq corre como nodo paralelo ultra-veloz si está activo
       if (keys.groq) { 
         fetchGroq(prompt); 
       }
     });
 
-    // Detectar Enter en móviles de forma segura
     document.getElementById('user-input').addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
         document.getElementById('launch-btn').click();
       }
     });
 
-    // --- MOTORES DE CONSULTA ---
-    async function fetchGemini(prompt) {
-      const ui = createEngineBlock('Google Gemini Cloud');
+    // --- CONECTORES DE APIS ---
+    async function fetchGemini(prompt, enableSearch = false) {
+      const label = enableSearch ? 'Google Gemini (Búsqueda Web Activa 🌐)' : 'Google Gemini Cloud';
+      const ui = createEngineBlock(label);
       try {
+        // Estructura de payload compatible con Gemini 2.5 y habilitación de Grounding
+        const payload = {
+          contents: [{ parts: [{ text: prompt }] }]
+        };
+
+        if (enableSearch) {
+          payload.tools = [{ googleSearch: {} }];
+        }
+
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${keys.gemini}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+          body: JSON.stringify(payload)
         });
         const data = await res.json();
-        ui.content.innerText = data.candidates[0].content.parts[0].text;
-        ui.header.innerHTML = `<span>🤖 Google Gemini Cloud</span> <span class="text-green-400 text-[10px]">🟢 ONLINE</span>`;
+        
+        let responseText = data.candidates[0].content.parts[0].text;
+        
+        // Mostrar fuentes de búsqueda si están disponibles en los metadatos
+        if (enableSearch && data.candidates[0].groundingMetadata?.groundingChunks) {
+          responseText += '\n\n🌐 **Fuentes consultadas en tiempo real:**';
+          data.candidates[0].groundingMetadata.groundingChunks.forEach(chunk => {
+            if (chunk.web?.uri) {
+              responseText += `\n- [${chunk.web.title || 'Enlace'}](${chunk.web.uri})`;
+            }
+          });
+        }
+
+        ui.content.innerText = responseText;
+        ui.header.innerHTML = `<span>🤖 ${label}</span> <span class="text-green-400 text-[10px]">🟢 ONLINE</span>`;
       } catch (err) {
-        ui.content.innerText = 'Error en Gemini Cloud.';
+        ui.content.innerText = 'Error en Gemini Cloud o en la consulta de red.';
       }
     }
 
