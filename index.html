@@ -1,1 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #fdfbf7; }
+        #canvas-container {
+            width: 100vw; height: 100vh;
+            cursor: grab;
+            transform-origin: 0 0;
+            /* Patrón de cuadrícula minimalista */
+            background-image: radial-gradient(#dcdcdc 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+
+<script>
+    const container = document.getElementById('canvas-container');
+    let scale = 1;
+    let posX = 0;
+    let posY = 0;
+    let isDragging = false;
+    let startX, startY;
+
+    // Lógica de Zoom
+    container.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        scale *= delta;
+        container.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+    });
+
+    // Lógica de Desplazamiento (Pan)
+    container.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        startX = e.clientX - posX;
+        startY = e.clientY - posY;
+        container.style.cursor = 'grabbing';
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        posX = e.clientX - startX;
+        posY = e.clientY - startY;
+        container.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+    });
+
+    window.addEventListener('mouseup', () => {
+        isDragging = false;
+        container.style.cursor = 'grab';
+    });
+</script>
+</body>
+</html>
 
