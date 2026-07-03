@@ -46,7 +46,17 @@
     </footer>
   </div>
 
-  <script>
+  <script type="importmap">
+    {
+      "imports": {
+        "@google/generative-ai": "https://esm.run/@google/generative-ai"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import { GoogleGenAI } from '@google/generative-ai';
+
     const keys = {
       gemini: localStorage.getItem('_om_key_gemini') || '',
       openai: localStorage.getItem('_om_key_openai') || '',
@@ -54,7 +64,6 @@
       groq: localStorage.getItem('_om_key_groq') || ''
     };
 
-    // Proxy transparente optimizado para Apps en Vercel
     const corsProxy = "https://corsproxy.io/?";
 
     document.getElementById('key-gemini').value = keys.gemini;
@@ -62,14 +71,14 @@
     document.getElementById('key-openrouter').value = keys.openrouter;
     document.getElementById('key-groq').value = keys.groq;
     
-    document.getElementById('debug-keys').innerText = `Nodos: Gemini (${keys.gemini?'SI':'NO'}) | OpenAI (${keys.openai?'SI':'NO'}) | OpenRouter (${keys.openrouter?'SI':'NO'}) | Groq (${keys.groq?'SI':'NO'})`;
+    document.getElementById('debug-keys').innerText = `Nodos activos: Gemini (${keys.gemini?'OK':'NO'}) | OpenAI (${keys.openai?'OK':'NO'}) | OpenRouter (${keys.openrouter?'OK':'NO'})`;
 
-    function toggleKeyManager() {
+    window.toggleKeyManager = function() {
       const isHidden = document.getElementById('key-manager').classList.toggle('hidden');
       document.getElementById('chat-screen').classList.toggle('hidden', !isHidden);
     }
 
-    function saveAllKeys() {
+    window.saveAllKeys = function() {
       localStorage.setItem('_om_key_gemini', document.getElementById('key-gemini').value.trim());
       localStorage.setItem('_om_key_openai', document.getElementById('key-openai').value.trim());
       localStorage.setItem('_om_key_openrouter', document.getElementById('key-openrouter').value.trim());
@@ -119,23 +128,22 @@
       container.appendChild(msgDiv);
     }
 
-    // CORRECCIÓN DE ENDPOINT: Se cambia v1beta por v1 estable para evitar el Error 404
+    // LLAMADA MEDIANTE EL SDK INYECTADO PARA ASEGURAR INTEGRIDAD
     async function fetchGemini(prompt) {
       const ui = createEngineBlock('Gemini 1.5 Flash');
       if (!keys.gemini) { ui.content.innerText = "Falta llave de Gemini."; ui.status.innerText = "⚠️ VACÍO"; return; }
       try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${keys.gemini}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        const ai = new GoogleGenAI({ apiKey: keys.gemini });
+        const response = await ai.models.generateContent({
+          model: 'gemini-1.5-flash',
+          contents: prompt,
         });
-        const data = await res.json();
-        ui.content.innerText = data.candidates[0].content.parts[0].text;
+        ui.content.innerText = response.text;
         ui.status.innerText = "🟢 NODO ONLINE";
         ui.status.className = "text-[9px] text-green-400 font-mono";
       } catch (err) { 
-        ui.content.innerText = "Error de comunicación con el nodo estable v1 de Gemini."; 
-        ui.status.innerText = "🔴 ERROR";
+        ui.content.innerText = "Error en enlace SDK. Verifica si las restricciones de IP de tu API Key en Google Cloud están bloqueando Vercel."; 
+        ui.status.innerText = "🔴 ERROR INTERNO";
         ui.status.className = "text-[9px] text-red-500 font-mono";
       }
     }
@@ -154,13 +162,12 @@
         ui.status.innerText = "🟢 NODO ONLINE";
         ui.status.className = "text-[9px] text-green-400 font-mono";
       } catch (err) { 
-        ui.content.innerText = "Error de autenticación o cuota en OpenAI."; 
+        ui.content.innerText = "Error de origen cruzado en OpenAI."; 
         ui.status.innerText = "🔴 ERROR";
         ui.status.className = "text-[9px] text-red-500 font-mono";
       }
     }
 
-    // EL CONECTOR RESTAURADO DE OPENROUTER (OPENSOURCE)
     async function fetchOpenRouter(prompt) {
       const ui = createEngineBlock('OpenRouter (Open Source)');
       if (!keys.openrouter) { ui.content.innerText = "Falta llave de OpenRouter."; ui.status.innerText = "⚠️ VACÍO"; return; }
@@ -170,8 +177,7 @@
           headers: { 
             'Content-Type': 'application/json', 
             'Authorization': `Bearer ${keys.openrouter}`,
-            'HTTP-Referer': window.location.origin,
-            'X-Title': 'Ómhnibus App'
+            'HTTP-Referer': window.location.origin
           },
           body: JSON.stringify({ model: 'meta-llama/llama-3-8b-instruct:free', messages: [{ role: 'user', content: prompt }] })
         });
@@ -180,7 +186,7 @@
         ui.status.innerText = "🟢 NODO ONLINE";
         ui.status.className = "text-[9px] text-green-400 font-mono";
       } catch (err) { 
-        ui.content.innerText = "Error en el nodo OpenRouter. Verifica tus créditos o la API Key."; 
+        ui.content.innerText = "Fallo en la comunicación con OpenRouter."; 
         ui.status.innerText = "🔴 ERROR";
         ui.status.className = "text-[9px] text-red-500 font-mono";
       }
@@ -200,7 +206,7 @@
         ui.status.innerText = "🟢 NODO ONLINE";
         ui.status.className = "text-[9px] text-green-400 font-mono";
       } catch (err) { 
-        ui.content.innerText = "Groq denegó el acceso. Revisa el rate-limit de tu consola."; 
+        ui.content.innerText = "Error en Groq Node."; 
         ui.status.innerText = "🔴 ERROR";
         ui.status.className = "text-[9px] text-red-500 font-mono";
       }
