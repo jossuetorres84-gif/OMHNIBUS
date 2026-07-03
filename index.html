@@ -4,16 +4,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <style>
         body { margin: 0; background: #0b132b; color: white; font-family: sans-serif; overflow: hidden; height: 100vh; }
-        .node { position: absolute; width: 90px; height: 90px; background: #3a86ff; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; touch-action: none; border: 3px solid white; z-index: 10; }
-        .controls { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: center; gap: 10px; z-index: 20; }
-        button { padding: 10px 20px; border-radius: 20px; border: none; background: #ff006e; color: white; font-weight: bold; }
+        .node { position: absolute; width: 80px; height: 80px; background: #3a86ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; touch-action: none; border: 3px solid white; z-index: 10; font-size: 12px; }
+        .del-btn { position: absolute; top: -5px; right: -5px; background: red; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; display: flex; align-items: center; justify-content: center; }
     </style>
 </head>
 <body id="canvas">
-    <div style="padding: 10px;">Doble toque para crear. Mantén presionado para mover.</div>
-    <div class="controls">
-        <button onclick="deleteLast()">Eliminar último</button>
-    </div>
+    <div style="padding: 10px; pointer-events: none;">Doble toque para crear. Mantén presionado para mover.</div>
     <script>
         let lastTap = 0;
         document.getElementById('canvas').addEventListener('touchend', (e) => {
@@ -22,26 +18,30 @@
                 let n = document.createElement('div');
                 n.className = 'node';
                 n.innerText = 'Nodo';
-                n.style.left = (e.changedTouches[0].pageX - 45) + 'px';
-                n.style.top = (e.changedTouches[0].pageY - 45) + 'px';
+                
+                // Botón de eliminar individual
+                let d = document.createElement('div');
+                d.className = 'del-btn';
+                d.innerText = 'x';
+                d.ontouchstart = (ev) => { ev.stopPropagation(); n.remove(); };
+                n.appendChild(d);
+
+                n.style.left = (e.changedTouches[0].pageX - 40) + 'px';
+                n.style.top = (e.changedTouches[0].pageY - 40) + 'px';
                 
                 let isDragging = false;
-                n.addEventListener('touchstart', () => isDragging = true);
-                window.addEventListener('touchmove', (ev) => {
+                n.ontouchstart = (ev) => { if(ev.target !== d) isDragging = true; };
+                window.ontouchmove = (ev) => {
                     if(isDragging) {
-                        n.style.left = (ev.touches[0].pageX - 45) + 'px';
-                        n.style.top = (ev.touches[0].pageY - 45) + 'px';
+                        n.style.left = (ev.touches[0].pageX - 40) + 'px';
+                        n.style.top = (ev.touches[0].pageY - 40) + 'px';
                     }
-                });
-                window.addEventListener('touchend', () => isDragging = false);
+                };
+                window.ontouchend = () => isDragging = false;
                 document.body.appendChild(n);
             }
             lastTap = now;
         });
-        function deleteLast() {
-            let nodes = document.querySelectorAll('.node');
-            if(nodes.length > 0) nodes[nodes.length - 1].remove();
-        }
     </script>
 </body>
 </html>
