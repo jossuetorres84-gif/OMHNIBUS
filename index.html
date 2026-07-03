@@ -9,7 +9,6 @@
 <body class="bg-[#0b0f19] text-slate-100 font-sans antialiased">
 
   <div class="flex flex-col h-screen max-w-2xl mx-auto p-4 justify-between">
-    <!-- Encabezado -->
     <header class="flex justify-between items-center py-2 border-b border-slate-800">
       <div class="flex items-center gap-2">
         <h1 class="text-xl font-bold tracking-widest text-teal-400">ÓMHNIBUS</h1>
@@ -18,49 +17,30 @@
       <button onclick="toggleKeyManager()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-teal-300 font-semibold">🔑 Conectores</button>
     </header>
 
-    <!-- Administrador de Llaves Cloud Permanentes -->
     <div id="key-manager" class="hidden flex-1 flex flex-col justify-center px-4 space-y-3">
       <h3 class="text-sm font-semibold text-center text-teal-400">Panel de Conectores Cloud</h3>
       <div class="space-y-2 text-xs">
-        <div>
-          <label class="text-slate-400">Google Gemini Key (Búsqueda Web):</label>
-          <input type="password" id="key-gemini" placeholder="AIzaSy..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none">
-        </div>
-        <div>
-          <label class="text-slate-400">OpenAI GPT Key:</label>
-          <input type="password" id="key-openai" placeholder="sk-proj-..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none">
-        </div>
-        <div>
-          <label class="text-slate-400">OpenRouter Key:</label>
-          <input type="password" id="key-openrouter" placeholder="sk-or-v1-..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none">
-        </div>
-        <div>
-          <label class="text-slate-400">Groq Key:</label>
-          <input type="password" id="key-groq" placeholder="gsk_..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none">
-        </div>
+        <div><label class="text-slate-400">Google Gemini Key:</label><input type="password" id="key-gemini" placeholder="AIzaSy..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none"></div>
+        <div><label class="text-slate-400">OpenAI GPT Key:</label><input type="password" id="key-openai" placeholder="sk-..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none"></div>
+        <div><label class="text-slate-400">OpenRouter Key:</label><input type="password" id="key-openrouter" placeholder="sk-or-..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none"></div>
+        <div><label class="text-slate-400">Groq Key:</label><input type="password" id="key-groq" placeholder="gsk_..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none"></div>
       </div>
       <button onclick="saveAllKeys()" class="w-full bg-teal-600 hover:bg-teal-500 text-white py-2 rounded-lg text-xs font-semibold">Fijar Llaves</button>
     </div>
 
-    <!-- Lienzo Estilo Chatbot -->
     <main id="chat-screen" class="flex-1 overflow-y-auto my-4 space-y-4 pr-1 text-sm scroll-smooth">
-      <div id="empty-notice" class="text-center text-slate-600 mt-20 text-xs px-4">
-        Ecosistema listo. El Router Inteligente decidirá la mejor API. Activa el Consejo abajo para recibir respuestas reales de todos tus modelos en paralelo.
-      </div>
+      <div id="empty-notice" class="text-center text-slate-600 mt-20 text-xs px-4">Ecosistema listo. Lanza una instrucción.</div>
       <div id="messages-container" class="space-y-4 flex flex-col"></div>
     </main>
 
-    <!-- Panel de Control Inferior -->
     <footer id="controls-footer" class="space-y-2">
-      <!-- Botón de Ómhnibus Council -->
-      <button id="council-toggle-btn" class="w-full bg-slate-900 hover:bg-slate-850 border border-slate-800 py-2 rounded-xl flex items-center justify-center gap-2 text-xs font-semibold transition-all duration-300">
-        <span class="w-2 h-2 rounded-full bg-slate-500 shadow-[0_0_8px_rgba(148,163,184,0.5)]" id="council-indicator"></span>
+      <button id="council-toggle-btn" class="w-full bg-slate-900 border border-slate-800 py-2 rounded-xl flex items-center justify-center gap-2 text-xs font-semibold transition-all">
+        <span class="w-2 h-2 rounded-full bg-slate-500" id="council-indicator"></span>
         <span id="council-btn-text" class="text-slate-400">ÓMHNIBUS COUNCIL: DESACTIVADO</span>
       </button>
-
       <div class="flex gap-2">
-        <input type="text" id="user-input" placeholder="Escribe tu instrucción aquí..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500">
-        <button id="launch-btn" class="bg-teal-600 hover:bg-teal-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors">Lanzar</button>
+        <input type="text" id="user-input" placeholder="Escribe tu instrucción..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500">
+        <button id="launch-btn" class="bg-teal-600 hover:bg-teal-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold">Lanzar</button>
       </div>
     </footer>
   </div>
@@ -73,276 +53,87 @@
       groq: localStorage.getItem('_om_key_groq') || ''
     };
 
-    let showManager = false;
-    let useCouncil = false;
-
-    // Proxy alternativo y robusto para evitar fallos CORS en cabeceras de autorización
-    const corsProxy = "https://api.allorigins.win/raw?url=";
-
-    document.getElementById('key-gemini').value = keys.gemini;
-    document.getElementById('key-openai').value = keys.openai;
-    document.getElementById('key-openrouter').value = keys.openrouter;
-    document.getElementById('key-groq').value = keys.groq;
-
-    if (!keys.gemini && !keys.openai && !keys.openrouter && !keys.groq) {
-      toggleKeyManager();
-    }
+    // EL CAMBIO MAESTRO:
+    const corsProxy = "https://corsproxy.io/?";
 
     function toggleKeyManager() {
-      showManager = !showManager;
-      if (showManager) {
-        document.getElementById('chat-screen').classList.add('hidden');
-        document.getElementById('key-manager').classList.remove('hidden');
-      } else {
-        document.getElementById('key-manager').classList.add('hidden');
-        document.getElementById('chat-screen').classList.remove('hidden');
-      }
+      const isHidden = document.getElementById('key-manager').classList.toggle('hidden');
+      document.getElementById('chat-screen').classList.toggle('hidden', !isHidden);
     }
 
     function saveAllKeys() {
-      keys.gemini = document.getElementById('key-gemini').value.trim();
-      keys.openai = document.getElementById('key-openai').value.trim();
-      keys.openrouter = document.getElementById('key-openrouter').value.trim();
-      keys.groq = document.getElementById('key-groq').value.trim();
-
-      localStorage.setItem('_om_key_gemini', keys.gemini);
-      localStorage.setItem('_om_key_openai', keys.openai);
-      localStorage.setItem('_om_key_openrouter', keys.openrouter);
-      localStorage.setItem('_om_key_groq', keys.groq);
-
-      showManager = false;
-      document.getElementById('key-manager').classList.add('hidden');
-      document.getElementById('chat-screen').classList.remove('hidden');
+      localStorage.setItem('_om_key_gemini', document.getElementById('key-gemini').value.trim());
+      localStorage.setItem('_om_key_openai', document.getElementById('key-openai').value.trim());
+      localStorage.setItem('_om_key_openrouter', document.getElementById('key-openrouter').value.trim());
+      localStorage.setItem('_om_key_groq', document.getElementById('key-groq').value.trim());
+      location.reload();
     }
 
+    let useCouncil = false;
     document.getElementById('council-toggle-btn').addEventListener('click', () => {
       useCouncil = !useCouncil;
-      const btn = document.getElementById('council-toggle-btn');
-      const indicator = document.getElementById('council-indicator');
-      const text = document.getElementById('council-btn-text');
-      const statusLabel = document.getElementById('router-status');
-
-      if (useCouncil) {
-        btn.classList.replace('border-slate-800', 'border-amber-500/50');
-        indicator.classList.replace('bg-slate-500', 'bg-amber-400');
-        indicator.classList.add('animate-ping');
-        text.innerText = 'ÓMHNIBUS COUNCIL: RESPUESTA MULTI-MODELO REAL ACTIVA';
-        text.className = 'text-amber-400 tracking-wider font-bold text-xs';
-        statusLabel.innerText = 'CONSEJO ACTIVO';
-        statusLabel.className = 'text-[10px] bg-amber-950 text-amber-400 px-2 py-0.5 rounded-full font-mono border border-amber-800';
-      } else {
-        btn.classList.replace('border-amber-500/50', 'border-slate-800');
-        indicator.classList.replace('bg-amber-400', 'bg-slate-500');
-        indicator.classList.remove('animate-ping');
-        text.innerText = 'ÓMHNIBUS COUNCIL: DESACTIVADO';
-        text.className = 'text-slate-400 font-semibold';
-        statusLabel.innerText = 'ROUTER ACTIVO';
-        statusLabel.className = 'text-[10px] bg-teal-950 text-teal-400 px-2 py-0.5 rounded-full font-mono border border-teal-800';
-      }
+      document.getElementById('council-indicator').classList.toggle('bg-amber-400');
+      document.getElementById('council-btn-text').innerText = useCouncil ? 'ÓMHNIBUS COUNCIL: ACTIVO' : 'ÓMHNIBUS COUNCIL: DESACTIVADO';
     });
 
-    function appendUserMessage(text) {
-      const container = document.getElementById('messages-container');
-      const msgDiv = document.createElement('div');
-      msgDiv.className = 'p-3 rounded-2xl max-w-[85%] bg-teal-600 text-white ml-auto whitespace-pre-wrap text-sm shadow-md my-1 self-end';
-      msgDiv.innerText = text;
-      container.appendChild(msgDiv);
-      autoScroll();
-    }
-
-    function createEngineBlock(engineName) {
-      const container = document.getElementById('messages-container');
-      const block = document.createElement('div');
-      block.className = 'p-3 rounded-2xl bg-slate-900 border border-slate-800 space-y-1 text-sm my-1 max-w-[90%] self-start shadow-inner w-full';
-      
-      const header = document.createElement('div');
-      header.className = 'text-[11px] font-bold tracking-wider uppercase text-slate-400 flex justify-between items-center gap-4 border-b border-slate-800 pb-1';
-      header.innerHTML = `<span>🤖 ${engineName}</span> <span class="text-teal-400 text-[9px] animate-pulse">PROCESANDO...</span>`;
-      
-      const content = document.createElement('div');
-      content.className = 'text-slate-300 whitespace-pre-wrap pt-1 leading-relaxed text-xs';
-      content.innerText = 'Esperando transmisión de datos crudos...';
-      
-      block.appendChild(header);
-      block.appendChild(content);
-      container.appendChild(block);
-      autoScroll();
-      return { content, header };
-    }
-
-    function autoScroll() {
-      const screen = document.getElementById('chat-screen');
-      screen.scrollTop = screen.scrollHeight;
-    }
-
-    document.getElementById('launch-btn').addEventListener('click', () => {
-      const inputEl = document.getElementById('user-input');
-      const prompt = inputEl.value.trim();
-      if (!prompt) return;
-
-      inputEl.value = '';
-      document.getElementById('empty-notice').classList.add('hidden');
-      appendUserMessage(prompt);
-
-      if (useCouncil) {
-        // Enviar peticiones simultáneas reales a cada API activa
-        if (keys.gemini) {
-          const isSearch = /busca|internet|red|tiempo real|noticias|hoy/i.test(prompt);
-          fetchGemini(prompt + "\n\n(Responde exclusivamente bajo el rol de: PERFORMANCE EXPERT)", isSearch);
-        }
-        if (keys.openai) {
-          fetchOpenAI(prompt + "\n\n(Responde exclusivamente bajo el rol de: SKEPTICAL ARCHITECT)");
-        }
-        if (keys.openrouter) {
-          fetchOpenRouter(prompt + "\n\n(Responde exclusivamente bajo el rol de: CONTEXT SUMMARY)");
-        }
-        if (keys.groq) {
-          fetchGroq(prompt + "\n\n(Responde exclusivamente bajo el rol de: SECURITY AUDITOR)");
-        }
-        return; 
-      }
-
-      // ROUTER INTELIGENTE INDIVIDUAL
-      const isSearchRequest = /busca|internet|red|tiempo real|noticias|actual|hoy|clima/i.test(prompt);
-      const isCoding = /código|programar|script|función|html|css|js|java|python|json/i.test(prompt);
-      const isComplex = prompt.length > 150 || /analiza|resume|debate|explica|comparar|audita/i.test(prompt);
-
-      if (isSearchRequest && keys.gemini) {
-        fetchGemini(prompt, true);
-      } else if (isCoding && keys.openai) {
-        fetchOpenAI(prompt);
-      } else if (isComplex && keys.gemini) {
-        fetchGemini(prompt, false);
-      } else if (keys.groq) {
-        fetchGroq(prompt);
-      } else if (keys.openrouter) {
-        fetchOpenRouter(prompt);
-      } else if (keys.gemini) {
-        fetchGemini(prompt, false);
-      } else {
-        alert("Configura una API válida primero.");
-      }
-    });
-
-    document.getElementById('user-input').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') document.getElementById('launch-btn').click();
-    });
-
-    // --- LLAMADAS DIRECTAS CORREGIDAS ---
-
-    async function fetchGemini(prompt, enableSearch = false) {
-      const label = enableSearch ? 'Google Gemini 2.5 Flash (Web Real 🌐)' : 'Google Gemini 2.5 Flash';
-      const ui = createEngineBlock(useCouncil ? `Council -> ${label}` : label);
+    async function fetchGemini(prompt) {
+      const ui = createEngineBlock('Gemini Flash');
       try {
-        const payload = { contents: [{ parts: [{ text: prompt }] }] };
-        if (enableSearch) payload.tools = [{ googleSearch: {} }];
-
-        // Gemini no tiene problemas de CORS directos desde cliente remoto
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${keys.gemini}`, {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${keys.gemini}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
         const data = await res.json();
-        
-        let txt = data.candidates[0].content.parts[0].text;
-        if (enableSearch && data.candidates[0].groundingMetadata?.groundingChunks) {
-          txt += '\n\n🌐 **Rastreo web realizado:**';
-          data.candidates[0].groundingMetadata.groundingChunks.forEach(chunk => {
-            if (chunk.web?.uri) txt += `\n- [${chunk.web.title || 'Link'}](${chunk.web.uri})`;
-          });
-        }
-        ui.content.innerText = txt;
-        ui.header.children[1].className = "text-green-400 text-[9px]";
-        ui.header.children[1].innerText = "🟢 NODO ONLINE";
-      } catch (err) {
-        ui.content.innerText = 'Fallo de respuesta o API Key incorrecta en Gemini.';
-        ui.header.children[1].className = "text-red-500 text-[9px]";
-        ui.header.children[1].innerText = "🔴 ERROR";
-      }
-      autoScroll();
+        ui.content.innerText = data.candidates[0].content.parts[0].text;
+      } catch { ui.content.innerText = "Error en Nodo Gemini"; }
     }
 
     async function fetchOpenAI(prompt) {
-      const label = 'OpenAI gpt-4o-mini';
-      const ui = createEngineBlock(useCouncil ? `Council -> ${label}` : label);
+      const ui = createEngineBlock('OpenAI GPT-4o-mini');
       try {
-        const targetUrl = 'https://api.openai.com/v1/chat/completions';
-        const res = await fetch(corsProxy + encodeURIComponent(targetUrl), {
+        const res = await fetch(corsProxy + encodeURIComponent('https://api.openai.com/v1/chat/completions'), {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json', 
-            'Authorization': `Bearer ${keys.openai}` 
-          },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.openai}` },
           body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] })
         });
         const data = await res.json();
         ui.content.innerText = data.choices[0].message.content;
-        ui.header.children[1].className = "text-green-400 text-[9px]";
-        ui.header.children[1].innerText = "🟢 NODO ONLINE";
-      } catch (err) {
-        ui.content.innerText = 'Fallo de autenticación o respuesta en nodo OpenAI GPT.';
-        ui.header.children[1].className = "text-red-500 text-[9px]";
-        ui.header.children[1].innerText = "🔴 ERROR";
-      }
-      autoScroll();
-    }
-
-    async function fetchOpenRouter(prompt) {
-      const label = 'OpenRouter Llama 3';
-      const ui = createEngineBlock(useCouncil ? `Council -> ${label}` : label);
-      try {
-        const targetUrl = 'https://openrouter.ai/api/v1/chat/completions';
-        const res = await fetch(corsProxy + encodeURIComponent(targetUrl), {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json', 
-            'Authorization': `Bearer ${keys.openrouter}`
-          },
-          body: JSON.stringify({ 
-            model: 'meta-llama/llama-3-8b-instruct:free', 
-            messages: [{ role: 'user', content: prompt }] 
-          })
-        });
-        const data = await res.json();
-        ui.content.innerText = data.choices[0].message.content;
-        ui.header.children[1].className = "text-green-400 text-[9px]";
-        ui.header.children[1].innerText = "🟢 NODO ONLINE";
-      } catch (err) {
-        ui.content.innerText = 'Límitación de cuota free o error de parseo en OpenRouter.';
-        ui.header.children[1].className = "text-red-500 text-[9px]";
-        ui.header.children[1].innerText = "🔴 ERROR";
-      }
-      autoScroll();
+      } catch { ui.content.innerText = "Error de autenticación OpenAI"; }
     }
 
     async function fetchGroq(prompt) {
-      const label = 'Groq Llama 3.3 70B';
-      const ui = createEngineBlock(useCouncil ? `Council -> ${label}` : label);
+      const ui = createEngineBlock('Groq Llama 3.3');
       try {
-        const targetUrl = 'https://api.groq.com/openai/v1/chat/completions';
-        const res = await fetch(corsProxy + encodeURIComponent(targetUrl), {
+        const res = await fetch(corsProxy + encodeURIComponent('https://api.groq.com/openai/v1/chat/completions'), {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json', 
-            'Authorization': `Bearer ${keys.groq}` 
-          },
-          body: JSON.stringify({ 
-            model: 'llama-3.3-70b-versatile', 
-            messages: [{ role: 'user', content: prompt }] 
-          })
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.groq}` },
+          body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }] })
         });
         const data = await res.json();
         ui.content.innerText = data.choices[0].message.content;
-        ui.header.children[1].className = "text-green-400 text-[9px]";
-        ui.header.children[1].innerText = "🟢 NODO ONLINE";
-      } catch (err) {
-        ui.content.innerText = 'Fallo de comunicación en nodo Groq Cloud (Verifica tu API Key).';
-        ui.header.children[1].className = "text-red-500 text-[9px]";
-        ui.header.children[1].innerText = "🔴 ERROR";
-      }
-      autoScroll();
+      } catch { ui.content.innerText = "Error en Nodo Groq"; }
     }
+
+    function createEngineBlock(name) {
+      const div = document.createElement('div');
+      div.className = 'p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs';
+      div.innerHTML = `<div class='font-bold text-teal-400'>${name}</div><div class='mt-1 text-slate-300'>Cargando...</div>`;
+      document.getElementById('messages-container').appendChild(div);
+      return { content: div.children[1] };
+    }
+
+    document.getElementById('launch-btn').onclick = () => {
+      const p = document.getElementById('user-input').value;
+      if (!p) return;
+      if (useCouncil) {
+        if (keys.gemini) fetchGemini(p);
+        if (keys.openai) fetchOpenAI(p);
+        if (keys.groq) fetchGroq(p);
+      } else {
+        fetchGemini(p);
+      }
+    };
   </script>
 </body>
 </html>
