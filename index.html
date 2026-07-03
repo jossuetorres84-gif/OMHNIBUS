@@ -3,16 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ÓMHNIBUS Total Engine</title>
+  <title>ÓMHNIBUS Core Engine</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-[#0b0f19] text-slate-100 font-sans antialiased">
 
   <div class="flex flex-col h-screen max-w-2xl mx-auto p-4 justify-between">
-    <!-- Encabezado Unificado -->
+    <!-- Encabezado -->
     <header class="flex justify-between items-center py-2 border-b border-slate-800">
-      <h1 class="text-xl font-bold tracking-widest text-teal-400">ÓMHNIBUS</h1>
-      <button onclick="toggleKeyManager()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-teal-300 font-semibold">🔑 Conectores Cloud</button>
+      <div class="flex items-center gap-2">
+        <h1 class="text-xl font-bold tracking-widest text-teal-400">ÓMHNIBUS</h1>
+        <span id="router-status" class="text-[10px] bg-teal-950 text-teal-400 px-2 py-0.5 rounded-full font-mono border border-teal-800">ROUTER ACTIVO</span>
+      </div>
+      <button onclick="toggleKeyManager()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-teal-300 font-semibold">🔑 Conectores</button>
     </header>
 
     <!-- Administrador de Llaves Cloud Permanentes -->
@@ -20,7 +23,7 @@
       <h3 class="text-sm font-semibold text-center text-teal-400">Panel de Conectores Cloud</h3>
       <div class="space-y-2 text-xs">
         <div>
-          <label class="text-slate-400">Google Gemini Key (Soporta Búsqueda Web):</label>
+          <label class="text-slate-400">Google Gemini Key (Búsqueda Web):</label>
           <input type="password" id="key-gemini" placeholder="AIzaSy..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none">
         </div>
         <div>
@@ -39,25 +42,25 @@
       <button onclick="saveAllKeys()" class="w-full bg-teal-600 hover:bg-teal-500 text-white py-2 rounded-lg text-xs font-semibold">Fijar Llaves</button>
     </div>
 
-    <!-- Lienzo de Chat Concurrente -->
-    <main id="chat-screen" class="flex-1 overflow-y-auto my-4 space-y-4 pr-1 text-sm">
-      <div id="empty-notice" class="text-center text-slate-600 mt-20 text-xs">
-        Ecosistema listo. Usa palabras clave como "busca" para activar internet en tiempo real, o enciende el Consejo abajo para recibir opiniones múltiples concurrentes.
+    <!-- Lienzo Estilo Chatbot -->
+    <main id="chat-screen" class="flex-1 overflow-y-auto my-4 space-y-4 pr-1 text-sm scroll-smooth">
+      <div id="empty-notice" class="text-center text-slate-600 mt-20 text-xs px-4">
+        Ecosistema síncrono listo. El Router Inteligente decidirá la mejor API según tu mensaje. Activa el Consejo abajo para debate multi-modelo paralelo.
       </div>
-      <div id="messages-container" class="space-y-4"></div>
+      <div id="messages-container" class="space-y-4 flex flex-col"></div>
     </main>
 
     <!-- Panel de Control Inferior -->
     <footer id="controls-footer" class="space-y-2">
-      <div class="flex items-center justify-between bg-slate-900/50 p-2 rounded-lg border border-slate-800/60 text-xs">
-        <span class="text-slate-400">Activar ÓmhnibusCouncil (Fusión de Criterio Multi-Modelo)</span>
-        <button id="council-btn" class="w-9 h-5 flex items-center bg-slate-700 rounded-full p-1 duration-200">
-          <span id="council-dot" class="bg-white w-3 h-3 rounded-full shadow-sm transition-transform"></span>
-        </button>
-      </div>
+      <!-- Botón de Ómhnibus Council Intermitente/Conmutable -->
+      <button id="council-toggle-btn" class="w-full bg-slate-900 hover:bg-slate-850 border border-slate-800 py-2 rounded-xl flex items-center justify-center gap-2 text-xs font-semibold transition-all duration-300">
+        <span class="w-2 h-2 rounded-full bg-slate-500 shadow-[0_0_8px_rgba(148,163,184,0.5)]" id="council-indicator"></span>
+        <span id="council-btn-text" class="text-slate-400">ÓMHNIBUS COUNCIL: DESACTIVADO</span>
+      </button>
+
       <div class="flex gap-2">
-        <input type="text" id="user-input" placeholder="Enviar instrucción..." class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-teal-500">
-        <button id="launch-btn" class="bg-teal-600 hover:bg-teal-500 text-white px-4 py-2 rounded-lg text-sm font-semibold">Lanzar</button>
+        <input type="text" id="user-input" placeholder="Escribe tu instrucción aquí..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500">
+        <button id="launch-btn" class="bg-teal-600 hover:bg-teal-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors">Lanzar</button>
       </div>
     </footer>
   </div>
@@ -73,7 +76,7 @@
     let showManager = false;
     let useCouncil = false;
 
-    // Cargar inputs al iniciar
+    // Cargar inputs del localStorage
     document.getElementById('key-gemini').value = keys.gemini;
     document.getElementById('key-openai').value = keys.openai;
     document.getElementById('key-openrouter').value = keys.openrouter;
@@ -110,50 +113,68 @@
       document.getElementById('chat-screen').classList.remove('hidden');
     }
 
-    // Manejador del Switch del Consejo
-    document.getElementById('council-btn').addEventListener('click', () => {
+    // Lógica Interactiva del Botón del ÓMHNIBUS COUNCIL
+    document.getElementById('council-toggle-btn').addEventListener('click', () => {
       useCouncil = !useCouncil;
-      const btn = document.getElementById('council-btn');
-      const dot = document.getElementById('council-dot');
+      const btn = document.getElementById('council-toggle-btn');
+      const indicator = document.getElementById('council-indicator');
+      const text = document.getElementById('council-btn-text');
+      const statusLabel = document.getElementById('router-status');
+
       if (useCouncil) {
-        btn.classList.replace('bg-slate-700', 'bg-teal-500');
-        dot.classList.add('translate-x-4');
+        btn.classList.replace('border-slate-800', 'border-amber-500/50');
+        indicator.classList.replace('bg-slate-500', 'bg-amber-400');
+        indicator.classList.add('animate-ping');
+        text.innerText = 'ÓMHNIBUS COUNCIL: MODALIDAD MULTI-MODELO ACTIVA';
+        text.className = 'text-amber-400 tracking-wider font-bold';
+        statusLabel.innerText = 'CONSEJO ACTIVO';
+        statusLabel.className = 'text-[10px] bg-amber-950 text-amber-400 px-2 py-0.5 rounded-full font-mono border border-amber-800';
       } else {
-        btn.classList.replace('bg-teal-500', 'bg-slate-700');
-        dot.classList.remove('translate-x-4');
+        btn.classList.replace('border-amber-500/50', 'border-slate-800');
+        indicator.classList.replace('bg-amber-400', 'bg-slate-500');
+        indicator.classList.remove('animate-ping');
+        text.innerText = 'ÓMHNIBUS COUNCIL: DESACTIVADO';
+        text.className = 'text-slate-400 font-semibold';
+        statusLabel.innerText = 'ROUTER ACTIVO';
+        statusLabel.className = 'text-[10px] bg-teal-950 text-teal-400 px-2 py-0.5 rounded-full font-mono border border-teal-800';
       }
     });
 
     function appendUserMessage(text) {
       const container = document.getElementById('messages-container');
       const msgDiv = document.createElement('div');
-      msgDiv.className = 'p-3 rounded-lg max-w-[85%] bg-teal-600 text-white ml-auto whitespace-pre-wrap';
+      msgDiv.className = 'p-3 rounded-2xl max-w-[85%] bg-teal-600 text-white ml-auto whitespace-pre-wrap text-sm shadow-md my-1 self-end';
       msgDiv.innerText = text;
       container.appendChild(msgDiv);
+      autoScroll();
     }
 
     function createEngineBlock(engineName) {
       const container = document.getElementById('messages-container');
       const block = document.createElement('div');
-      block.className = 'p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-1';
+      block.className = 'p-3 rounded-2xl bg-slate-900 border border-slate-800 space-y-1 text-sm my-1 max-w-[90%] self-start shadow-inner';
       
       const header = document.createElement('div');
-      header.className = 'text-xs font-bold tracking-wider uppercase text-slate-500 flex justify-between items-center';
-      header.innerHTML = `<span>🤖 ${engineName}</span> <span class="text-teal-400 text-[10px] animate-pulse">PROCESANDO...</span>`;
+      header.className = 'text-[11px] font-bold tracking-wider uppercase text-slate-400 flex justify-between items-center gap-4';
+      header.innerHTML = `<span>🤖 ${engineName}</span> <span class="text-teal-400 text-[9px] animate-pulse">PROCESANDO...</span>`;
       
       const content = document.createElement('div');
-      content.className = 'text-slate-200 whitespace-pre-wrap pt-1';
-      content.innerText = 'Esperando respuesta...';
+      content.className = 'text-slate-200 whitespace-pre-wrap pt-1 leading-relaxed';
+      content.innerText = 'Generando respuesta del nodo...';
       
       block.appendChild(header);
       block.appendChild(content);
       container.appendChild(block);
-      
-      document.getElementById('chat-screen').scrollTop = document.getElementById('chat-screen').scrollHeight;
+      autoScroll();
       return { content, header };
     }
 
-    // Vinculación del evento Lanzar
+    function autoScroll() {
+      const screen = document.getElementById('chat-screen');
+      screen.scrollTop = screen.scrollHeight;
+    }
+
+    // Disparador del Chatbot
     document.getElementById('launch-btn').addEventListener('click', () => {
       const inputEl = document.getElementById('user-input');
       const prompt = inputEl.value.trim();
@@ -163,59 +184,59 @@
       document.getElementById('empty-notice').classList.add('hidden');
       appendUserMessage(prompt);
 
-      // Si el Consejo está activo, forzar llamadas simultáneas con roles especializados
+      // 1. MODALIDAD ÓMHNIBUS COUNCIL: Ráfaga Multi-modelo Directa
       if (useCouncil) {
-        const baseCouncilPrompt = `Actúas en el ecosistema síncrono ÓmhnibusCouncil. Analiza la siguiente instrucción de nivel Senior: "${prompt}"\n\n`;
+        const basePrompt = `Ecosistema ÓmhnibusCouncil activo. Proporciona tu dictamen técnico Senior para la siguiente instrucción:\n"${prompt}"\n\n`;
         
         if (keys.gemini) {
-          const isSearchRequest = /busca|internet|red|tiempo real|noticias|actual|hoy/i.test(prompt);
-          fetchGemini(baseCouncilPrompt + "Asume el rol de PERFORMANCE EXPERT y optimización de flujos.", isSearchRequest);
+          const isSearch = /busca|internet|red|tiempo real|noticias|hoy/i.test(prompt);
+          fetchGemini(basePrompt + "Asume el rol de PERFORMANCE EXPERT enfocado en optimizaciones.", isSearch);
         }
         if (keys.openai) {
-          fetchOpenAI(baseCouncilPrompt + "Asume el rol de SKEPTICAL ARCHITECT, auditando la lógica técnica y detectando fallos potenciales estructurales.");
+          fetchOpenAI(basePrompt + "Asume el rol de SKEPTICAL ARCHITECT analizando debilidades estructurales.");
         }
         if (keys.openrouter) {
-          fetchOpenRouter(baseCouncilPrompt + "Asume el rol de GENERAL KNOWLEDGE SUMMARY, consolidando contexto histórico de soporte.");
+          fetchOpenRouter(basePrompt + "Asume el rol de CONTEXT ANALYST proveyendo referencias globales.");
         }
         if (keys.groq) {
-          fetchGroq(baseCouncilPrompt + "Asume el rol de SECURITY AUDITOR y análisis de riesgos en tiempo de ejecución.");
+          fetchGroq(basePrompt + "Asume el rol de SECURITY AUDITOR mitigando vulnerabilidades.");
         }
-        return; // Detener ejecución ordinaria del router inteligente
+        return; 
       }
 
-      // --- ENRUTAMIENTO INTELIGENTE ORDINARIO (Si el Consejo está apagado) ---
-      const isSearchRequest = /busca|internet|red|tiempo real|noticias|actual|hoy|clima|precio/i.test(prompt);
+      // 2. MODALIDAD ROUTER INTELIGENTE SELECCIONADO (Estrategia por Mensaje)
+      const isSearchRequest = /busca|internet|red|tiempo real|noticias|actual|hoy|clima/i.test(prompt);
       const isCoding = /código|programar|script|función|html|css|js|java|python|json/i.test(prompt);
-      const isComplex = prompt.length > 120 || /analiza|resume|debate|explica|comparar|audita/i.test(prompt);
+      const isComplex = prompt.length > 150 || /analiza|resume|debate|explica|comparar|audita/i.test(prompt);
 
       if (isSearchRequest && keys.gemini) {
         fetchGemini(prompt, true);
-      } else if (isCoding && keys.openai) { 
-        fetchOpenAI(prompt); 
-      } else if (isComplex && keys.gemini) { 
-        fetchGemini(prompt, false); 
-      } else if (keys.openrouter) { 
-        fetchOpenRouter(prompt); 
-      }
-
-      if (keys.groq && !isSearchRequest && !isCoding && !isComplex) { 
-        fetchGroq(prompt); 
+      } else if (isCoding && keys.openai) {
+        fetchOpenAI(prompt);
+      } else if (isComplex && keys.gemini) {
+        fetchGemini(prompt, false);
+      } else if (keys.groq) {
+        fetchGroq(prompt);
+      } else if (keys.openrouter) {
+        fetchOpenRouter(prompt);
+      } else if (keys.gemini) {
+        fetchGemini(prompt, false);
+      } else {
+        alert("Por favor, configura una API en el panel superior.");
       }
     });
 
     document.getElementById('user-input').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        document.getElementById('launch-btn').click();
-      }
+      if (e.key === 'Enter') document.getElementById('launch-btn').click();
     });
 
-    // --- CONECTORES DE APIS ---
+    // --- MANEJADORES DE LAS APIS ---
     async function fetchGemini(prompt, enableSearch = false) {
-      const label = enableSearch ? 'Gemini Council (Performance / Web 🌐)' : 'Gemini Council (Performance)';
-      const ui = createEngineBlock(useCouncil ? label : 'Google Gemini Cloud');
+      const label = enableSearch ? 'Gemini Engine (Web Grounding 🌐)' : 'Gemini Engine';
+      const ui = createEngineBlock(useCouncil ? `Council: ${label}` : label);
       try {
         const payload = { contents: [{ parts: [{ text: prompt }] }] };
-        if (enableSearch) { payload.tools = [{ googleSearch: {} }]; }
+        if (enableSearch) payload.tools = [{ googleSearch: {} }];
 
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${keys.gemini}`, {
           method: 'POST',
@@ -223,24 +244,25 @@
           body: JSON.stringify(payload)
         });
         const data = await res.json();
-        let responseText = data.candidates[0].content.parts[0].text;
-        
+        let txt = data.candidates[0].content.parts[0].text;
+
         if (enableSearch && data.candidates[0].groundingMetadata?.groundingChunks) {
-          responseText += '\n\n🌐 **Fuentes de red:**';
+          txt += '\n\n🌐 **Fuentes consultadas en la red:**';
           data.candidates[0].groundingMetadata.groundingChunks.forEach(chunk => {
-            if (chunk.web?.uri) responseText += `\n- [${chunk.web.title || 'Link'}](${chunk.web.uri})`;
+            if (chunk.web?.uri) txt += `\n- [${chunk.web.title || 'Referencia'}](${chunk.web.uri})`;
           });
         }
-
-        ui.content.innerText = responseText;
-        ui.header.innerHTML = `<span>🤖 ${useCouncil ? label : 'Google Gemini Cloud'}</span> <span class="text-green-400 text-[10px]">🟢 ONLINE</span>`;
+        ui.content.innerText = txt;
+        ui.header.children[1].className = "text-green-400 text-[9px]";
+        ui.header.children[1].innerText = "🟢 COMPLETADO";
       } catch (err) {
-        ui.content.innerText = 'Error en Gemini Cloud.';
+        ui.content.innerText = 'Fallo en la comunicación del nodo Gemini.';
       }
+      autoScroll();
     }
 
     async function fetchOpenAI(prompt) {
-      const label = useCouncil ? 'OpenAI Council (Skeptical Architect)' : 'OpenAI ChatGPT';
+      const label = useCouncil ? 'Council: OpenAI (Skeptical Architect)' : 'OpenAI ChatGPT';
       const ui = createEngineBlock(label);
       try {
         const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -250,15 +272,17 @@
         });
         const data = await res.json();
         ui.content.innerText = data.choices[0].message.content;
-        ui.header.innerHTML = `<span>🤖 ${label}</span> <span class="text-green-400 text-[10px]">🟢 ONLINE</span>`;
+        ui.header.children[1].className = "text-green-400 text-[9px]";
+        ui.header.children[1].innerText = "🟢 COMPLETADO";
       } catch (err) {
-        ui.content.innerText = 'Error en OpenAI.';
+        ui.content.innerText = 'Fallo en la comunicación de OpenAI.';
       }
+      autoScroll();
     }
 
     async function fetchOpenRouter(prompt) {
-      const label = useCouncil ? 'OpenRouter Council (Llama 3 Summary)' : 'MODELO: Llama 3 8B Instruct';
-      const ui = createEngineBlock(useCouncil ? label : 'OpenRouter / Buscando Modelo...');
+      const label = useCouncil ? 'Council: OpenRouter (Context Summary)' : 'OpenRouter Llama 3';
+      const ui = createEngineBlock(label);
       try {
         const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
@@ -272,15 +296,17 @@
         });
         const data = await res.json();
         ui.content.innerText = data.choices[0].message.content || JSON.stringify(data);
-        ui.header.innerHTML = `<span>🤖 ${useCouncil ? label : 'Llama 3 (vía OpenRouter)'}</span> <span class="text-green-400 text-[10px]">🟢 ONLINE</span>`;
+        ui.header.children[1].className = "text-green-400 text-[9px]";
+        ui.header.children[1].innerText = "🟢 COMPLETADO";
       } catch (err) {
-        ui.content.innerText = 'Error en OpenRouter.';
+        ui.content.innerText = 'Fallo en la comunicación de OpenRouter.';
       }
+      autoScroll();
     }
 
     async function fetchGroq(prompt) {
-      const label = useCouncil ? 'Groq Council (Security Auditor)' : 'MODELO: Llama 3.1 8B Instant';
-      const ui = createEngineBlock(useCouncil ? label : 'Groq / Buscando Nodo...');
+      const label = useCouncil ? 'Council: Groq (Security Auditor)' : 'Groq Llama 3.1';
+      const ui = createEngineBlock(label);
       try {
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
@@ -289,10 +315,12 @@
         });
         const data = await res.json();
         ui.content.innerText = data.choices[0].message.content || JSON.stringify(data);
-        ui.header.innerHTML = `<span>🤖 ${useCouncil ? label : 'Llama 3.1 (vía Groq)'}</span> <span class="text-green-400 text-[10px]">🟢 ONLINE</span>`;
+        ui.header.children[1].className = "text-green-400 text-[9px]";
+        ui.header.children[1].innerText = "🟢 COMPLETADO";
       } catch (err) {
-        ui.content.innerText = 'Error en Groq.';
+        ui.content.innerText = 'Fallo en la comunicación de Groq.';
       }
+      autoScroll();
     }
   </script>
 </body>
