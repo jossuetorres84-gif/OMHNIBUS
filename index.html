@@ -1,34 +1,47 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <style>
         body { margin: 0; background: #0b132b; color: white; font-family: sans-serif; overflow: hidden; height: 100vh; }
-        .node { position: absolute; width: 80px; height: 80px; background: #3a86ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; touch-action: none; border: 4px solid white; }
+        .node { position: absolute; width: 90px; height: 90px; background: #3a86ff; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; touch-action: none; border: 3px solid white; z-index: 10; }
+        .controls { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: center; gap: 10px; z-index: 20; }
+        button { padding: 10px 20px; border-radius: 20px; border: none; background: #ff006e; color: white; font-weight: bold; }
     </style>
 </head>
 <body id="canvas">
-    <div style="padding: 20px;">Toca dos veces para crear un Nodo. Arrastra para mover.</div>
+    <div style="padding: 10px;">Doble toque para crear. Mantén presionado para mover.</div>
+    <div class="controls">
+        <button onclick="deleteLast()">Eliminar último</button>
+    </div>
     <script>
         let lastTap = 0;
         document.getElementById('canvas').addEventListener('touchend', (e) => {
             let now = new Date().getTime();
-            if(now - lastTap < 300) {
+            if(now - lastTap < 300 && e.target.id === 'canvas') {
                 let n = document.createElement('div');
                 n.className = 'node';
-                n.style.left = (e.changedTouches[0].pageX - 40) + 'px';
-                n.style.top = (e.changedTouches[0].pageY - 40) + 'px';
+                n.innerText = 'Nodo';
+                n.style.left = (e.changedTouches[0].pageX - 45) + 'px';
+                n.style.top = (e.changedTouches[0].pageY - 45) + 'px';
                 
-                n.addEventListener('touchmove', (ev) => {
-                    n.style.left = (ev.touches[0].pageX - 40) + 'px';
-                    n.style.top = (ev.touches[0].pageY - 40) + 'px';
+                let isDragging = false;
+                n.addEventListener('touchstart', () => isDragging = true);
+                window.addEventListener('touchmove', (ev) => {
+                    if(isDragging) {
+                        n.style.left = (ev.touches[0].pageX - 45) + 'px';
+                        n.style.top = (ev.touches[0].pageY - 45) + 'px';
+                    }
                 });
-                
+                window.addEventListener('touchend', () => isDragging = false);
                 document.body.appendChild(n);
             }
             lastTap = now;
         });
+        function deleteLast() {
+            let nodes = document.querySelectorAll('.node');
+            if(nodes.length > 0) nodes[nodes.length - 1].remove();
+        }
     </script>
 </body>
 </html>
-
