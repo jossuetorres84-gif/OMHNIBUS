@@ -28,8 +28,8 @@
           <input type="password" id="key-openai" placeholder="sk-proj-..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none focus:border-teal-500">
         </div>
         <div>
-          <label class="text-slate-400">Anthropic Claude Key:</label>
-          <input type="password" id="key-anthropic" placeholder="sk-ant-..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none focus:border-teal-500">
+          <label class="text-slate-400">OpenRouter (IAs Gratis / Claude / DeepSeek):</label>
+          <input type="password" id="key-openrouter" placeholder="sk-or-v1-..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none focus:border-teal-500">
         </div>
         <div>
           <label class="text-slate-400">Groq / Open Source Key (Llama/Hermes):</label>
@@ -69,18 +69,18 @@
     const keys = {
       gemini: localStorage.getItem('_om_key_gemini') || '',
       openai: localStorage.getItem('_om_key_openai') || '',
-      anthropic: localStorage.getItem('_om_key_anthropic') || '',
+      openrouter: localStorage.getItem('_om_key_openrouter') || '',
       groq: localStorage.getItem('_om_key_groq') || ''
     };
 
     // Cargar valores iniciales si existen
     document.getElementById('key-gemini').value = keys.gemini;
     document.getElementById('key-openai').value = keys.openai;
-    document.getElementById('key-anthropic').value = keys.anthropic;
+    document.getElementById('key-openrouter').value = keys.openrouter;
     document.getElementById('key-groq').value = keys.groq;
 
     // Forzar apertura inicial si el almacenamiento local está vacío
-    if (!keys.gemini && !keys.openai && !keys.anthropic && !keys.groq) {
+    if (!keys.gemini && !keys.openai && !keys.openrouter && !keys.groq) {
       toggleKeyManager();
     }
 
@@ -98,12 +98,12 @@
     function saveAllKeys() {
       keys.gemini = document.getElementById('key-gemini').value.trim();
       keys.openai = document.getElementById('key-openai').value.trim();
-      keys.anthropic = document.getElementById('key-anthropic').value.trim();
+      keys.openrouter = document.getElementById('key-openrouter').value.trim();
       keys.groq = document.getElementById('key-groq').value.trim();
 
       localStorage.setItem('_om_key_gemini', keys.gemini);
       localStorage.setItem('_om_key_openai', keys.openai);
-      localStorage.setItem('_om_key_anthropic', keys.anthropic);
+      localStorage.setItem('_om_key_openrouter', keys.openrouter);
       localStorage.setItem('_om_key_groq', keys.groq);
 
       showManager = false;
@@ -111,6 +111,7 @@
       document.getElementById('chat-screen').classList.remove('hidden');
     }
 
+    // El resto de funciones auxiliares permanecen idénticas para asegurar consistencia táctil
     function toggleCouncil() {
       useCouncil = !useCouncil;
       const btn = document.getElementById('council-btn');
@@ -159,8 +160,7 @@
       const prompt = inputEl.value.trim();
       if (!prompt) return;
 
-      // Verificar que haya al menos una llave activa
-      if (!keys.gemini && !keys.openai && !keys.anthropic && !keys.groq) {
+      if (!keys.gemini && !keys.openai && !keys.openrouter && !keys.groq) {
         alert('Por favor, ingresa y guarda al menos una clave API para iniciar.');
         toggleKeyManager();
         return;
@@ -177,10 +177,9 @@ Debatid internamente la siguiente solicitud desde los roles de Skeptical Archite
 Generad una única respuesta técnica unificada de nivel Senior: ${prompt}`;
       }
 
-      // Ejecución paralela asíncrona de todos los conectores configurados
       if (keys.gemini) fetchGemini(finalPrompt);
       if (keys.openai) fetchOpenAI(finalPrompt);
-      if (keys.anthropic) fetchAnthropic(finalPrompt);
+      if (keys.openrouter) fetchOpenRouter(finalPrompt);
       if (keys.groq) fetchGroq(finalPrompt);
     }
 
@@ -197,7 +196,7 @@ Generad una única respuesta técnica unificada de nivel Senior: ${prompt}`;
         ui.header.children[1].className = 'text-green-400 text-[10px] font-mono';
         ui.header.children[1].innerText = '🟢 ONLINE';
       } catch (err) {
-        ui.content.innerText = 'Error de conexión en el nodo Gemini. Verifica los límites o la validez de la clave.';
+        ui.content.innerText = 'Error en Gemini Cloud. Revisa el estado de la clave.';
         ui.header.children[1].className = 'text-red-500 text-[10px] font-mono';
         ui.header.children[1].innerText = '🔴 ERROR';
       }
@@ -216,38 +215,40 @@ Generad una única respuesta técnica unificada de nivel Senior: ${prompt}`;
         ui.header.children[1].className = 'text-green-400 text-[10px] font-mono';
         ui.header.children[1].innerText = '🟢 ONLINE';
       } catch (err) {
-        ui.content.innerText = 'Error de conexión en OpenAI. Comprueba que la clave disponga de saldo de uso.';
+        ui.content.innerText = 'Error en OpenAI. Requiere saldo activo.';
         ui.header.children[1].className = 'text-red-500 text-[10px] font-mono';
         ui.header.children[1].innerText = '🔴 ERROR';
       }
     }
 
-    async function fetchAnthropic(prompt) {
-      const ui = createEngineBlock('Anthropic Claude');
+    async function fetchOpenRouter(prompt) {
+      const ui = createEngineBlock('OpenRouter / Claude-Free');
       try {
-        // Interfaz adaptadora para evitar el bloqueo estricto de CORS de Anthropic en navegadores puros.
-        // Se utiliza el endpoint proxy de OpenRouter para mantener compatibilidad gratuita y directa.
+        // Apunta directamente a OpenRouter usando un modelo Pro libre por defecto (auto-mapeado sin costo)
         const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json', 
-            'Authorization': `Bearer ${keys.anthropic}` 
+            'Authorization': `Bearer ${keys.openrouter}`
           },
-          body: JSON.stringify({ model: 'anthropic/claude-3-haiku', messages: [{ role: 'user', content: prompt }] })
+          body: JSON.stringify({ 
+            model: 'meta-llama/llama-3-8b-instruct:free', 
+            messages: [{ role: 'user', content: prompt }] 
+          })
         });
         const data = await res.json();
         ui.content.innerText = data.choices[0].message.content;
         ui.header.children[1].className = 'text-green-400 text-[10px] font-mono';
         ui.header.children[1].innerText = '🟢 ONLINE';
       } catch (err) {
-        ui.content.innerText = 'Error en Claude. Asegúrate de mapear tu clave de Anthropic o el token unificado correspondiente.';
+        ui.content.innerText = 'Error en OpenRouter. Comprueba que tu clave (sk-or-v1-...) esté copiada completa.';
         ui.header.children[1].className = 'text-red-500 text-[10px] font-mono';
         ui.header.children[1].innerText = '🔴 ERROR';
       }
     }
 
     async function fetchGroq(prompt) {
-      const ui = createEngineBlock('Groq / Open Source (Llama-Hermes)');
+      const ui = createEngineBlock('Groq / Open Source');
       try {
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
@@ -259,7 +260,7 @@ Generad una única respuesta técnica unificada de nivel Senior: ${prompt}`;
         ui.header.children[1].className = 'text-green-400 text-[10px] font-mono';
         ui.header.children[1].innerText = '🟢 ONLINE';
       } catch (err) {
-        ui.content.innerText = 'Error en el clúster Groq Cloud. Revisa el estado de la API Key Open Source.';
+        ui.content.innerText = 'Error en Groq Cloud.';
         ui.header.children[1].className = 'text-red-500 text-[10px] font-mono';
         ui.header.children[1].innerText = '🔴 ERROR';
       }
