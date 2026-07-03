@@ -3,80 +3,69 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ÓMHNIBUS Multi-Engine</title>
+  <title>ÓMHNIBUS Total Engine</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-[#0b0f19] text-slate-100 font-sans antialiased">
 
   <div class="flex flex-col h-screen max-w-2xl mx-auto p-4 justify-between">
-    <!-- Encabezado con Selector Dinámico de IA -->
-    <header class="flex justify-between items-center py-2 border-b border-slate-800 gap-2">
+    <!-- Encabezado Unificado -->
+    <header class="flex justify-between items-center py-2 border-b border-slate-800">
       <h1 class="text-xl font-bold tracking-widest text-teal-400">ÓMHNIBUS</h1>
-      
-      <div class="flex items-center gap-2">
-        <select id="engine-selector" onchange="handleEngineChange()" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-teal-300 focus:outline-none">
-          <option value="gemini">Google Gemini (Gratis)</option>
-          <option value="openai">OpenAI ChatGPT</option>
-          <option value="anthropic">Anthropic Claude</option>
-          <option value="groq">Groq / Open Source (Llama/Hermes)</option>
-        </select>
-        <button onclick="showKeyManager()" class="text-xs bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded border border-slate-700">🔑 Keys</button>
-      </div>
+      <button onclick="toggleKeyManager()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-teal-300 font-semibold">🔑 Gestionar Conectores Cloud</button>
     </header>
 
-    <!-- Administrador de Llaves Cloud (Modal integrado) -->
+    <!-- Administrador de Llaves Cloud Permanentes -->
     <div id="key-manager" class="hidden flex-1 flex flex-col justify-center px-4 space-y-3">
-      <h3 class="text-sm font-semibold text-center text-teal-400">Panel de Conectores Cloud</h3>
+      <h3 class="text-sm font-semibold text-center text-teal-400">Panel de Conectores Cloud (Persistente)</h3>
       <div class="space-y-2 text-xs">
         <div>
           <label class="text-slate-400">Google Gemini Key:</label>
-          <input type="password" id="key-gemini" placeholder="AIzaSy..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white">
+          <input type="password" id="key-gemini" placeholder="AIzaSy..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none focus:border-teal-500">
         </div>
         <div>
           <label class="text-slate-400">OpenAI GPT Key:</label>
-          <input type="password" id="key-openai" placeholder="sk-proj-..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white">
+          <input type="password" id="key-openai" placeholder="sk-proj-..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none focus:border-teal-500">
         </div>
         <div>
           <label class="text-slate-400">Anthropic Claude Key:</label>
-          <input type="password" id="key-anthropic" placeholder="sk-ant-..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white">
+          <input type="password" id="key-anthropic" placeholder="sk-ant-..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none focus:border-teal-500">
         </div>
         <div>
-          <label class="text-slate-400">Groq / Open Source Key:</label>
-          <input type="password" id="key-groq" placeholder="gsk_..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white">
+          <label class="text-slate-400">Groq / Open Source Key (Llama/Hermes):</label>
+          <input type="password" id="key-groq" placeholder="gsk_..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none focus:border-teal-500">
         </div>
       </div>
-      <button onclick="saveAllKeys()" class="w-full bg-teal-600 hover:bg-teal-500 text-white py-2 rounded-lg text-xs font-semibold">Guardar y Vincular Nube</button>
+      <button onclick="saveAllKeys()" class="w-full bg-teal-600 hover:bg-teal-500 text-white py-2 rounded-lg text-xs font-semibold">Fijar Llaves en el Dispositivo</button>
     </div>
 
-    <!-- Lienzo de Chat Unificado -->
-    <main id="chat-screen" class="flex-1 overflow-y-auto my-4 space-y-3 pr-1 text-sm">
-      <div id="empty-notice" class="text-center text-slate-600 mt-20">
-        Ecosistema multi-ia listo. Elige un proveedor e inicia el flujo.
+    <!-- Lienzo de Chat Concurrente -->
+    <main id="chat-screen" class="flex-1 overflow-y-auto my-4 space-y-4 pr-1 text-sm">
+      <div id="empty-notice" class="text-center text-slate-600 mt-20 text-xs">
+        Ecosistema síncrono activo. Configura tus llaves y lanza una instrucción para ejecutar todas las IAs en paralelo.
       </div>
-      <div id="messages-container" class="space-y-3"></div>
-      <div id="loading-indicator" class="hidden text-xs text-slate-500 animate-pulse">
-        ÓMHNIBUS procesando en el nodo seleccionado...
-      </div>
+      <div id="messages-container" class="space-y-4"></div>
     </main>
 
     <!-- Panel de Control Inferior -->
     <footer id="controls-footer" class="space-y-2">
       <div class="flex items-center justify-between bg-slate-900/50 p-2 rounded-lg border border-slate-800/60 text-xs">
-        <span class="text-slate-400">Activar ÓmhnibusCouncil (Multi-Agente)</span>
+        <span class="text-slate-400">Activar ÓmhnibusCouncil (Fusión de Criterio)</span>
         <button id="council-btn" onclick="toggleCouncil()" class="w-9 h-5 flex items-center bg-slate-700 rounded-full p-1 duration-200">
           <span id="council-dot" class="bg-white w-3 h-3 rounded-full shadow-sm transition-transform"></span>
         </button>
       </div>
       <div class="flex gap-2">
-        <input type="text" id="user-input" placeholder="Escribe una instrucción..." class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-teal-500" onkeypress="if(event.key === 'Enter') sendPrompt()">
-        <button onclick="sendPrompt()" class="bg-teal-600 hover:bg-teal-500 text-white px-4 py-2 rounded-lg text-sm font-semibold">Enviar</button>
+        <input type="text" id="user-input" placeholder="Enviar instrucción a todos los motores..." class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-teal-500" onkeypress="if(event.key === 'Enter') sendPromptAll()">
+        <button onclick="sendPromptAll()" class="bg-teal-600 hover:bg-teal-500 text-white px-4 py-2 rounded-lg text-sm font-semibold">Lanzar</button>
       </div>
     </footer>
   </div>
 
-  <!-- Orquestador Inteligente Multi-Adaptador -->
   <script>
     let useCouncil = false;
+    let showManager = false;
+    
     const keys = {
       gemini: localStorage.getItem('_om_key_gemini') || '',
       openai: localStorage.getItem('_om_key_openai') || '',
@@ -84,20 +73,26 @@
       groq: localStorage.getItem('_om_key_groq') || ''
     };
 
-    // Inicializar campos del gestor de llaves
+    // Cargar valores iniciales si existen
     document.getElementById('key-gemini').value = keys.gemini;
     document.getElementById('key-openai').value = keys.openai;
     document.getElementById('key-anthropic').value = keys.anthropic;
     document.getElementById('key-groq').value = keys.groq;
 
-    // Si falta la llave del motor por defecto, abrir configuración
-    if (!keys.gemini) {
-      showKeyManager();
+    // Forzar apertura inicial si el almacenamiento local está vacío
+    if (!keys.gemini && !keys.openai && !keys.anthropic && !keys.groq) {
+      toggleKeyManager();
     }
 
-    function showKeyManager() {
-      document.getElementById('chat-screen').classList.add('hidden');
-      document.getElementById('key-manager').classList.remove('hidden');
+    function toggleKeyManager() {
+      showManager = !showManager;
+      if (showManager) {
+        document.getElementById('chat-screen').classList.add('hidden');
+        document.getElementById('key-manager').classList.remove('hidden');
+      } else {
+        document.getElementById('key-manager').classList.add('hidden');
+        document.getElementById('chat-screen').classList.remove('hidden');
+      }
     }
 
     function saveAllKeys() {
@@ -111,16 +106,9 @@
       localStorage.setItem('_om_key_anthropic', keys.anthropic);
       localStorage.setItem('_om_key_groq', keys.groq);
 
+      showManager = false;
       document.getElementById('key-manager').classList.add('hidden');
       document.getElementById('chat-screen').classList.remove('hidden');
-    }
-
-    function handleEngineChange() {
-      const selected = document.getElementById('engine-selector').value;
-      if (!keys[selected]) {
-        alert(`Recuerda configurar la clave para el motor: ${selected.toUpperCase()}`);
-        showKeyManager();
-      }
     }
 
     function toggleCouncil() {
@@ -136,20 +124,51 @@
       }
     }
 
-    async function sendPrompt() {
+    function appendUserMessage(text) {
+      const container = document.getElementById('messages-container');
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'p-3 rounded-lg max-w-[85%] bg-teal-600 text-white ml-auto whitespace-pre-wrap text-sm';
+      msgDiv.innerText = text;
+      container.appendChild(msgDiv);
+      document.getElementById('chat-screen').scrollTop = document.getElementById('chat-screen').scrollHeight;
+    }
+
+    function createEngineBlock(engineName) {
+      const container = document.getElementById('messages-container');
+      const block = document.createElement('div');
+      block.className = 'p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-1 text-sm';
+      
+      const header = document.createElement('div');
+      header.className = 'text-xs font-bold tracking-wider uppercase text-slate-500 flex justify-between items-center';
+      header.innerHTML = `<span>🤖 ${engineName}</span> <span class="animate-pulse text-teal-400 text-[10px]">PROCESANDO...</span>`;
+      
+      const content = document.createElement('div');
+      content.className = 'text-slate-200 whitespace-pre-wrap pt-1';
+      content.innerText = 'Esperando flujo de respuesta...';
+      
+      block.appendChild(header);
+      block.appendChild(content);
+      container.appendChild(block);
+      
+      document.getElementById('chat-screen').scrollTop = document.getElementById('chat-screen').scrollHeight;
+      return { block, content, header };
+    }
+
+    async function sendPromptAll() {
       const inputEl = document.getElementById('user-input');
       const prompt = inputEl.value.trim();
       if (!prompt) return;
 
-      const engine = document.getElementById('engine-selector').value;
-      if (!keys[engine]) return alert('Por favor, configura la clave de este motor primero.');
+      // Verificar que haya al menos una llave activa
+      if (!keys.gemini && !keys.openai && !keys.anthropic && !keys.groq) {
+        alert('Por favor, ingresa y guarda al menos una clave API para iniciar.');
+        toggleKeyManager();
+        return;
+      }
 
       inputEl.value = '';
       document.getElementById('empty-notice').classList.add('hidden');
-      appendMessage('user', prompt);
-
-      const loader = document.getElementById('loading-indicator');
-      loader.classList.remove('hidden');
+      appendUserMessage(prompt);
 
       let finalPrompt = prompt;
       if (useCouncil) {
@@ -158,61 +177,92 @@ Debatid internamente la siguiente solicitud desde los roles de Skeptical Archite
 Generad una única respuesta técnica unificada de nivel Senior: ${prompt}`;
       }
 
+      // Ejecución paralela asíncrona de todos los conectores configurados
+      if (keys.gemini) fetchGemini(finalPrompt);
+      if (keys.openai) fetchOpenAI(finalPrompt);
+      if (keys.anthropic) fetchAnthropic(finalPrompt);
+      if (keys.groq) fetchGroq(finalPrompt);
+    }
+
+    async function fetchGemini(prompt) {
+      const ui = createEngineBlock('Google Gemini Cloud');
       try {
-        let reply = '';
-        
-        // Enrutamiento Dinámico según el motor seleccionado
-        if (engine === 'gemini') {
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${keys.gemini}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: finalPrompt }] }] })
-          });
-          const data = await res.json();
-          reply = data.candidates[0].content.parts[0].text;
-
-        } else if (engine === 'openai') {
-          const res = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.openai}` },
-            body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: finalPrompt }] })
-          });
-          const data = await res.json();
-          reply = data.choices[0].message.content;
-
-        } else if (engine === 'anthropic') {
-          // Nota: Las llamadas directas de cliente a Anthropic suelen requerir proxy por CORS; 
-          // se mapea el canal estándar estructurado.
-          reply = "[Canal Claude inicializado] Configura un proxy intermedio para saltar las restricciones CORS nativas de Anthropic en navegadores.";
-
-        } else if (engine === 'groq') {
-          // Groq procesa modelos Open Source líderes (Llama 3, Hermes, Mixtral) a velocidad ultra-rápida y gratis
-          const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.groq}` },
-            body: JSON.stringify({ model: 'llama3-8b-8192', messages: [{ role: 'user', content: finalPrompt }] })
-          });
-          const data = await res.json();
-          reply = data.choices[0].message.content;
-        }
-
-        appendMessage('system', reply);
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${keys.gemini}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        });
+        const data = await res.json();
+        ui.content.innerText = data.candidates[0].content.parts[0].text;
+        ui.header.children[1].className = 'text-green-400 text-[10px] font-mono';
+        ui.header.children[1].innerText = '🟢 ONLINE';
       } catch (err) {
-        appendMessage('system', 'Error en el nodo de red. Revisa la validez de tu llave.');
-      } {
-        loader.classList.add('hidden');
+        ui.content.innerText = 'Error de conexión en el nodo Gemini. Verifica los límites o la validez de la clave.';
+        ui.header.children[1].className = 'text-red-500 text-[10px] font-mono';
+        ui.header.children[1].innerText = '🔴 ERROR';
       }
     }
 
-    function appendMessage(sender, text) {
-      const container = document.getElementById('messages-container');
-      const msgDiv = document.createElement('div');
-      msgDiv.className = sender === 'user' 
-        ? 'p-3 rounded-lg max-w-[85%] bg-teal-600 text-white ml-auto whitespace-pre-wrap'
-        : 'p-3 rounded-lg max-w-[85%] bg-slate-900 border border-slate-800 text-slate-200 whitespace-pre-wrap';
-      msgDiv.innerText = text;
-      container.appendChild(msgDiv);
-      document.getElementById('chat-screen').scrollTop = document.getElementById('chat-screen').scrollHeight;
+    async function fetchOpenAI(prompt) {
+      const ui = createEngineBlock('OpenAI ChatGPT');
+      try {
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.openai}` },
+          body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] })
+        });
+        const data = await res.json();
+        ui.content.innerText = data.choices[0].message.content;
+        ui.header.children[1].className = 'text-green-400 text-[10px] font-mono';
+        ui.header.children[1].innerText = '🟢 ONLINE';
+      } catch (err) {
+        ui.content.innerText = 'Error de conexión en OpenAI. Comprueba que la clave disponga de saldo de uso.';
+        ui.header.children[1].className = 'text-red-500 text-[10px] font-mono';
+        ui.header.children[1].innerText = '🔴 ERROR';
+      }
+    }
+
+    async function fetchAnthropic(prompt) {
+      const ui = createEngineBlock('Anthropic Claude');
+      try {
+        // Interfaz adaptadora para evitar el bloqueo estricto de CORS de Anthropic en navegadores puros.
+        // Se utiliza el endpoint proxy de OpenRouter para mantener compatibilidad gratuita y directa.
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json', 
+            'Authorization': `Bearer ${keys.anthropic}` 
+          },
+          body: JSON.stringify({ model: 'anthropic/claude-3-haiku', messages: [{ role: 'user', content: prompt }] })
+        });
+        const data = await res.json();
+        ui.content.innerText = data.choices[0].message.content;
+        ui.header.children[1].className = 'text-green-400 text-[10px] font-mono';
+        ui.header.children[1].innerText = '🟢 ONLINE';
+      } catch (err) {
+        ui.content.innerText = 'Error en Claude. Asegúrate de mapear tu clave de Anthropic o el token unificado correspondiente.';
+        ui.header.children[1].className = 'text-red-500 text-[10px] font-mono';
+        ui.header.children[1].innerText = '🔴 ERROR';
+      }
+    }
+
+    async function fetchGroq(prompt) {
+      const ui = createEngineBlock('Groq / Open Source (Llama-Hermes)');
+      try {
+        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.groq}` },
+          body: JSON.stringify({ model: 'llama3-8b-8192', messages: [{ role: 'user', content: prompt }] })
+        });
+        const data = await res.json();
+        ui.content.innerText = data.choices[0].message.content;
+        ui.header.children[1].className = 'text-green-400 text-[10px] font-mono';
+        ui.header.children[1].innerText = '🟢 ONLINE';
+      } catch (err) {
+        ui.content.innerText = 'Error en el clúster Groq Cloud. Revisa el estado de la API Key Open Source.';
+        ui.header.children[1].className = 'text-red-500 text-[10px] font-mono';
+        ui.header.children[1].innerText = '🔴 ERROR';
+      }
     }
   </script>
 </body>
