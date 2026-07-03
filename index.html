@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ÓMHNIBUS - Lienzo Interactivo Profesional</title>
+    <title>ÓMHNIBUS - Canvas Inteligente</title>
     <style>
         :root {
             --bg-color: #090d16;
@@ -60,7 +60,6 @@
             stroke-linecap: round;
         }
 
-        /* Contenedor del Nodo con Transformación Combinada (Posición + Rotación) */
         .node-container {
             position: absolute;
             display: flex;
@@ -70,7 +69,6 @@
             z-index: 10;
         }
 
-        /* El cuerpo visual del nodo que recibe la forma geométrica */
         .node-body {
             width: 100%;
             height: 100%;
@@ -91,7 +89,7 @@
             transition: border-color 0.2s, box-shadow 0.2s;
         }
 
-        /* Diccionario Geométrico */
+        /* Formas Geométricas */
         .shape-circle { border-radius: 50%; clip-path: none; }
         .shape-square { border-radius: 14px; clip-path: none; }
         .shape-triangle { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); padding-top: 20px; }
@@ -99,7 +97,6 @@
         .shape-hexagon { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); }
         .shape-rhombus { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
 
-        /* Estados de Selección */
         .container-selected .node-body {
             border-color: #3a86ff;
             box-shadow: 0 0 25px rgba(58, 134, 255, 0.5);
@@ -109,7 +106,7 @@
             box-shadow: 0 0 25px rgba(255, 190, 11, 0.6);
         }
 
-        /* --- MANEJADORES ESTILO MIRO/WORD --- */
+        /* Manejadores Visuales */
         .handle {
             position: absolute;
             display: none;
@@ -126,25 +123,10 @@
             font-size: 10px;
         }
 
-        /* Mostrar controles al seleccionar */
         .container-selected .handle { display: flex; }
+        .handle-resize { right: -10px; bottom: -10px; cursor: se-resize; }
+        .handle-rotate { top: -35px; left: calc(50% - 12px); background: #00f5d4; cursor: grab; }
 
-        /* Manejador de Tamaño (Esquina Inferior Derecha) */
-        .handle-resize {
-            right: -10px;
-            bottom: -10px;
-            cursor: se-resize;
-        }
-
-        /* Manejador de Orientación/Rotación (Línea Superior Central) */
-        .handle-rotate {
-            top: -35px;
-            left: calc(50% - 12px);
-            background: #00f5d4;
-            cursor: grab;
-        }
-
-        /* Línea estética de conexión al control de rotación */
         .container-selected::before {
             content: '';
             position: absolute;
@@ -158,7 +140,7 @@
         }
         .container-selected::before { display: block; }
 
-        /* Menús */
+        /* Menús Contextuales */
         .context-menu {
             position: absolute;
             background: rgba(9, 13, 22, 0.95);
@@ -209,7 +191,7 @@
 <body>
 
     <div class="hud">
-        🌌 Paneo: 1 Dedo Fondo | 📱 Zoom: 2 Dedos | 🔘 Doble Toque: Crear | 🎯 Toque Nodo: Controles Visuales
+        🌌 ÓMHNIBUS Core | 🔘 Doble Toque Fondo: Crear | 🔘 Doble Toque Figura: Editar Texto | 🎯 Mantener: Menú
     </div>
 
     <div id="viewport">
@@ -219,7 +201,6 @@
     </div>
 
     <div id="menu-contextual" class="context-menu">
-        <button id="menu-text">✏️ Editar Texto</button>
         <button id="menu-connect">🔗 Conectar A...</button>
         <button id="menu-shape-trigger">💎 Cambiar Forma ➔</button>
         <button id="menu-del" class="btn-del">🗑️ Eliminar Nodo</button>
@@ -265,7 +246,7 @@
         }
         applyTransform();
 
-        // Desactivar selección activa al tocar el fondo vacío
+        // Control de fondo vacío
         viewport.addEventListener('touchstart', (e) => {
             ocultarMenu();
             if (e.target === viewport || e.target === canvas || e.target.id === 'svg-connections') {
@@ -322,7 +303,7 @@
             }
         });
 
-        // --- CONSTRUCCIÓN DE NODOS CON HERRAMIENTAS DE TRANSFORMACIÓN ---
+        // --- SISTEMA DE CREACIÓN DE NODOS ---
         function createNode(x, y) {
             nodeCount++;
             
@@ -333,12 +314,10 @@
             body.className = 'node-body shape-circle';
             body.innerText = 'Nodo ' + nodeCount;
             
-            // Manejador de Dimensionamiento Manual (Estilo Word/PowerPoint/Miro)
             const handleResize = document.createElement('div');
             handleResize.className = 'handle handle-resize';
             handleResize.innerHTML = '📐';
 
-            // Manejador de Orientación Manual (Rotación Estilo Miro)
             const handleRotate = document.createElement('div');
             handleRotate.className = 'handle handle-rotate';
             handleRotate.innerHTML = '🔄';
@@ -363,15 +342,33 @@
             }
             updateNodeStyle();
 
-            // --- EVENTOS INTERACTIVOS ---
             let isDragging = false;
             let pressTimer = null;
+            let lastNodeTap = 0; // Rastreo específico de doble toque en la figura
 
             body.addEventListener('touchstart', (ev) => {
                 ev.stopPropagation();
                 ocultarMenu();
                 
-                // Activar la selección del contorno visual del nodo
+                let now = Date.now();
+                
+                // DETECCIÓN DE DOBLE TOQUE DIRECTO PARA EDITAR TEXTO
+                if (now - lastNodeTap < 300) {
+                    clearTimeout(pressTimer);
+                    isDragging = false;
+                    
+                    setTimeout(() => {
+                        let nuevoTexto = prompt("Modificar contenido del nodo:", body.innerText);
+                        if (nuevoTexto !== null && nuevoTexto.trim() !== "") {
+                            body.innerText = nuevoTexto;
+                        }
+                    }, 50);
+                    
+                    lastNodeTap = now;
+                    return;
+                }
+                lastNodeTap = now;
+
                 nodes.forEach(n => n.container.classList.remove('container-selected'));
                 container.classList.add('container-selected');
 
@@ -406,7 +403,7 @@
                 isDragging = false;
             });
 
-            // --- LÓGICA TÁCTIL: CAMBIAR TAMAÑO DINÁMICO ---
+            // Manejador de tamaño
             let isResizing = false;
             let startW = 0, startH = 0, startTouchX = 0, startTouchY = 0;
 
@@ -424,7 +421,6 @@
                 let deltaX = (ev.touches[0].clientX - startTouchX) / scale;
                 let deltaY = (ev.touches[0].clientY - startTouchY) / scale;
 
-                // Restringir proporciones lógicas (mínimo 50px, máximo 400px)
                 nodeObj.width = Math.min(Math.max(startW + deltaX, 50), 400);
                 nodeObj.height = Math.min(Math.max(startH + deltaY, 50), 400);
 
@@ -434,9 +430,8 @@
 
             window.addEventListener('touchend', () => { isResizing = false; });
 
-            // --- LÓGICA TÁCTIL: CAMBIAR ORIENTACIÓN (ROTACIÓN) ---
+            // Manejador de rotación
             let isRotating = false;
-
             handleRotate.addEventListener('touchstart', (ev) => {
                 ev.stopPropagation();
                 isRotating = true;
@@ -445,16 +440,11 @@
             window.addEventListener('touchmove', (ev) => {
                 if (!isRotating) return;
                 let touch = ev.touches[0];
-                
-                // Obtener posición del centro del nodo en la pantalla global
                 const rect = body.getBoundingClientRect();
                 const centerX = rect.left + rect.width / 2;
                 const centerY = rect.top + rect.height / 2;
-
-                // Calcular ángulo trigonométrico entre el dedo y el centro del nodo
                 const radians = Math.atan2(touch.clientX - centerX, -(touch.clientY - centerY));
                 nodeObj.rotation = radians * (180 / Math.PI);
-
                 updateNodeStyle();
             });
 
@@ -492,17 +482,6 @@
             nodeTargetSelected.shape = newShape;
             ocultarMenu();
         }
-
-        document.getElementById('menu-text').addEventListener('touchstart', (e) => {
-            e.stopPropagation();
-            ocultarMenu();
-            setTimeout(() => {
-                let nuevoNombre = prompt("Contenido del Nodo:", nodeTargetSelected.body.innerText);
-                if (nuevoNombre !== null && nuevoNombre.trim() !== "") {
-                    nodeTargetSelected.body.innerText = nuevoNombre;
-                }
-            }, 100);
-        });
 
         document.getElementById('menu-connect').addEventListener('touchstart', (e) => {
             e.stopPropagation();
@@ -548,4 +527,5 @@
     </script>
 </body>
 </html>
+
 
