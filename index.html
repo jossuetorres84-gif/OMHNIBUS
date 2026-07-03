@@ -11,26 +11,30 @@
             touch-action: none; 
         }
 
-        /* Variables para el sistema de color */
+        /* Variables de estado */
         body.dark-mode { background-color: #1a1a1a; }
         body.dark-mode #canvas-container { background-image: radial-gradient(#333 1px, transparent 1px); }
 
         #canvas-container {
-            width: 100vw; height: 100vh;
+            width: 100vw; 
+            height: 100vh;
             cursor: grab;
             transform-origin: 0 0;
             background-image: radial-gradient(#dcdcdc 1px, transparent 1px);
             background-size: 40px 40px;
-            transition: background-image 0.3s ease;
+            /* Aseguramos que ocupe todo el espacio pero no interfiera con el botón */
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
         }
 
-        /* Botón fijo que no se mueve con el lienzo */
         #theme-toggle {
             position: fixed;
             top: 20px;
             right: 20px;
             padding: 10px 20px;
-            z-index: 1000;
+            z-index: 1000; /* Siempre encima del lienzo */
             cursor: pointer;
             background: #e0dcd5;
             border: none;
@@ -55,12 +59,13 @@
     let isDragging = false;
     let startX, startY;
 
-    // Función de cambio de modo
+    // Función de cambio de modo (Preservada)
     themeBtn.addEventListener('click', () => {
         document.body.classList.toggle('dark-mode');
         themeBtn.innerText = document.body.classList.contains('dark-mode') ? 'Modo Claro' : 'Modo Oscuro';
     });
 
+    // Lógica de Zoom (Restaurada y Verificada)
     container.addEventListener('wheel', (e) => {
         e.preventDefault();
         const delta = e.deltaY > 0 ? 0.9 : 1.1;
@@ -68,6 +73,7 @@
         container.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
     }, { passive: false });
 
+    // Lógica de Desplazamiento (Restaurada y Verificada)
     container.addEventListener('pointerdown', (e) => {
         isDragging = true;
         startX = e.clientX - posX;
