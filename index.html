@@ -1,4 +1,4 @@
-    <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -23,6 +23,7 @@
       <div class="space-y-2 text-xs">
         <div><label class="text-slate-400">Google Gemini Key:</label><input type="password" id="key-gemini" placeholder="AIzaSy..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none"></div>
         <div><label class="text-slate-400">OpenAI GPT Key:</label><input type="password" id="key-openai" placeholder="sk-..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none"></div>
+        <div><label class="text-slate-400">OpenRouter Key:</label><input type="password" id="key-openrouter" placeholder="sk-or-..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none"></div>
         <div><label class="text-slate-400">Groq Key:</label><input type="password" id="key-groq" placeholder="gsk_..." class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 mt-1 text-white focus:outline-none"></div>
       </div>
       <button onclick="saveAllKeys()" class="w-full bg-teal-600 hover:bg-teal-500 text-white py-2 rounded-lg text-xs font-semibold">Fijar Llaves</button>
@@ -49,18 +50,19 @@
     const keys = {
       gemini: localStorage.getItem('_om_key_gemini') || '',
       openai: localStorage.getItem('_om_key_openai') || '',
+      openrouter: localStorage.getItem('_om_key_openrouter') || '',
       groq: localStorage.getItem('_om_key_groq') || ''
     };
 
-    // Proxy alternativo ultra-estable que permite inyección directa sin codificar la URI
-    const proxyUrl = "https://api.allorigins.win/raw?url=";
+    // Proxy transparente optimizado para Apps en Vercel
+    const corsProxy = "https://corsproxy.io/?";
 
-    // Rellenar campos y depurar estado de llaves
     document.getElementById('key-gemini').value = keys.gemini;
     document.getElementById('key-openai').value = keys.openai;
+    document.getElementById('key-openrouter').value = keys.openrouter;
     document.getElementById('key-groq').value = keys.groq;
     
-    document.getElementById('debug-keys').innerText = `Llaves cargadas: Gemini (${keys.gemini ? 'SI' : 'NO'}), OpenAI (${keys.openai ? 'SI' : 'NO'}), Groq (${keys.groq ? 'SI' : 'NO'})`;
+    document.getElementById('debug-keys').innerText = `Nodos: Gemini (${keys.gemini?'SI':'NO'}) | OpenAI (${keys.openai?'SI':'NO'}) | OpenRouter (${keys.openrouter?'SI':'NO'}) | Groq (${keys.groq?'SI':'NO'})`;
 
     function toggleKeyManager() {
       const isHidden = document.getElementById('key-manager').classList.toggle('hidden');
@@ -70,6 +72,7 @@
     function saveAllKeys() {
       localStorage.setItem('_om_key_gemini', document.getElementById('key-gemini').value.trim());
       localStorage.setItem('_om_key_openai', document.getElementById('key-openai').value.trim());
+      localStorage.setItem('_om_key_openrouter', document.getElementById('key-openrouter').value.trim());
       localStorage.setItem('_om_key_groq', document.getElementById('key-groq').value.trim());
       location.reload();
     }
@@ -105,10 +108,7 @@
       const screen = document.getElementById('chat-screen');
       screen.scrollTop = screen.scrollHeight;
       
-      return { 
-        content: div.children[1], 
-        status: div.children[0].children[1] 
-      };
+      return { content: div.children[1], status: div.children[0].children[1] };
     }
 
     function appendUserMessage(text) {
@@ -119,51 +119,34 @@
       container.appendChild(msgDiv);
     }
 
-    // LLAMADA DIRECTA AL API DE GOOGLE (SIN INTERMEDIARIOS)
+    // CORRECCIÓN DE ENDPOINT: Se cambia v1beta por v1 estable para evitar el Error 404
     async function fetchGemini(prompt) {
       const ui = createEngineBlock('Gemini 1.5 Flash');
-      if (!keys.gemini) {
-        ui.content.innerText = "Falta la API Key de Gemini en Conectores.";
-        ui.status.innerText = "⚠️ LLAVE VACÍA";
-        return;
-      }
+      if (!keys.gemini) { ui.content.innerText = "Falta llave de Gemini."; ui.status.innerText = "⚠️ VACÍO"; return; }
       try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${keys.gemini}`, {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${keys.gemini}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
         const data = await res.json();
-        if (data.candidates && data.candidates[0].content.parts[0].text) {
-          ui.content.innerText = data.candidates[0].content.parts[0].text;
-          ui.status.innerText = "🟢 NODO ONLINE";
-          ui.status.className = "text-[9px] text-green-400 font-mono";
-        } else {
-          throw new Error(JSON.stringify(data));
-        }
+        ui.content.innerText = data.candidates[0].content.parts[0].text;
+        ui.status.innerText = "🟢 NODO ONLINE";
+        ui.status.className = "text-[9px] text-green-400 font-mono";
       } catch (err) { 
-        ui.content.innerText = `Error en Gemini: ${err.message || 'Verifica la validez de tu llave.'}`; 
+        ui.content.innerText = "Error de comunicación con el nodo estable v1 de Gemini."; 
         ui.status.innerText = "🔴 ERROR";
         ui.status.className = "text-[9px] text-red-500 font-mono";
       }
     }
 
-    // ARREGLO DE ENRUTAMIENTO LIMPIO PARA OPENAI (PASA POR EL MODERADOR SIN USAR PROXIES RESTRICTIVOS)
     async function fetchOpenAI(prompt) {
       const ui = createEngineBlock('OpenAI GPT-4o-mini');
-      if (!keys.openai) {
-        ui.content.innerText = "Falta la API Key de OpenAI en Conectores.";
-        ui.status.innerText = "⚠️ LLAVE VACÍA";
-        return;
-      }
+      if (!keys.openai) { ui.content.innerText = "Falta llave de OpenAI."; ui.status.innerText = "⚠️ VACÍO"; return; }
       try {
-        // Usamos una URL directa con el proxy libre de CORS-io alternativo
-        const res = await fetch(`https://corsproxy.io/?` + encodeURIComponent('https://api.openai.com/v1/chat/completions'), {
+        const res = await fetch(corsProxy + encodeURIComponent('https://api.openai.com/v1/chat/completions'), {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${keys.openai}`
-          },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.openai}` },
           body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] })
         });
         const data = await res.json();
@@ -171,27 +154,45 @@
         ui.status.innerText = "🟢 NODO ONLINE";
         ui.status.className = "text-[9px] text-green-400 font-mono";
       } catch (err) { 
-        ui.content.innerText = "Error CORS o autenticación en OpenAI. Asegúrate de que tu saldo/llave sea correcto."; 
+        ui.content.innerText = "Error de autenticación o cuota en OpenAI."; 
         ui.status.innerText = "🔴 ERROR";
         ui.status.className = "text-[9px] text-red-500 font-mono";
       }
     }
 
-    // ARREGLO DE ENRUTAMIENTO LIMPIO PARA GROQ
-    async function fetchGroq(prompt) {
-      const ui = createEngineBlock('Groq Llama 3.3 70B');
-      if (!keys.groq) {
-        ui.content.innerText = "Falta la API Key de Groq en Conectores.";
-        ui.status.innerText = "⚠️ LLAVE VACÍA";
-        return;
-      }
+    // EL CONECTOR RESTAURADO DE OPENROUTER (OPENSOURCE)
+    async function fetchOpenRouter(prompt) {
+      const ui = createEngineBlock('OpenRouter (Open Source)');
+      if (!keys.openrouter) { ui.content.innerText = "Falta llave de OpenRouter."; ui.status.innerText = "⚠️ VACÍO"; return; }
       try {
-        const res = await fetch(`https://corsproxy.io/?` + encodeURIComponent('https://api.groq.com/openai/v1/chat/completions'), {
+        const res = await fetch(corsProxy + encodeURIComponent('https://openrouter.ai/api/v1/chat/completions'), {
           method: 'POST',
           headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${keys.groq}`
+            'Content-Type': 'application/json', 
+            'Authorization': `Bearer ${keys.openrouter}`,
+            'HTTP-Referer': window.location.origin,
+            'X-Title': 'Ómhnibus App'
           },
+          body: JSON.stringify({ model: 'meta-llama/llama-3-8b-instruct:free', messages: [{ role: 'user', content: prompt }] })
+        });
+        const data = await res.json();
+        ui.content.innerText = data.choices[0].message.content;
+        ui.status.innerText = "🟢 NODO ONLINE";
+        ui.status.className = "text-[9px] text-green-400 font-mono";
+      } catch (err) { 
+        ui.content.innerText = "Error en el nodo OpenRouter. Verifica tus créditos o la API Key."; 
+        ui.status.innerText = "🔴 ERROR";
+        ui.status.className = "text-[9px] text-red-500 font-mono";
+      }
+    }
+
+    async function fetchGroq(prompt) {
+      const ui = createEngineBlock('Groq Llama 3.3 70B');
+      if (!keys.groq) { ui.content.innerText = "Falta llave de Groq."; ui.status.innerText = "⚠️ VACÍO"; return; }
+      try {
+        const res = await fetch(corsProxy + encodeURIComponent('https://api.groq.com/openai/v1/chat/completions'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.groq}` },
           body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }] })
         });
         const data = await res.json();
@@ -199,7 +200,7 @@
         ui.status.innerText = "🟢 NODO ONLINE";
         ui.status.className = "text-[9px] text-green-400 font-mono";
       } catch (err) { 
-        ui.content.innerText = "Groq rechazó la conexión. Revisa las cuotas de tu dashboard."; 
+        ui.content.innerText = "Groq denegó el acceso. Revisa el rate-limit de tu consola."; 
         ui.status.innerText = "🔴 ERROR";
         ui.status.className = "text-[9px] text-red-500 font-mono";
       }
@@ -215,14 +216,15 @@
       appendUserMessage(prompt);
 
       if (useCouncil) {
-        await fetchGemini(prompt);
-        await fetchOpenAI(prompt);
-        await fetchGroq(prompt);
+        if (keys.gemini) await fetchGemini(prompt);
+        if (keys.openai) await fetchOpenAI(prompt);
+        if (keys.openrouter) await fetchOpenRouter(prompt);
+        if (keys.groq)   await fetchGroq(prompt);
       } else {
-        await fetchGemini(prompt);
+        if (keys.gemini) await fetchGemini(prompt);
+        else alert("Asigna tus llaves en el panel superior.");
       }
     };
   </script>
 </body>
 </html>
-   
