@@ -2,13 +2,18 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <!-- Meta tag crucial para asegurar el correcto escalado en pantallas de smartphones -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #fdfbf7; }
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #fdfbf7; 
+            /* Evita comportamientos extraños de scroll elástico en móviles */
+            touch-action: none; 
+        }
         #canvas-container {
             width: 100vw; height: 100vh;
             cursor: grab;
             transform-origin: 0 0;
-            /* Patrón de cuadrícula minimalista */
             background-image: radial-gradient(#dcdcdc 1px, transparent 1px);
             background-size: 40px 40px;
         }
@@ -26,34 +31,40 @@
     let isDragging = false;
     let startX, startY;
 
-    // Lógica de Zoom
+    // Zoom universal: Soporta la rueda del mouse y el scroll de trackpads/pantallas
     container.addEventListener('wheel', (e) => {
         e.preventDefault();
         const delta = e.deltaY > 0 ? 0.9 : 1.1;
         scale *= delta;
         container.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
-    });
+    }, { passive: false });
 
-    // Lógica de Desplazamiento (Pan)
-    container.addEventListener('mousedown', (e) => {
+    // Desplazamiento Universal usando Pointer Events (Mouse, Touch, Stylus)
+    container.addEventListener('pointerdown', (e) => {
         isDragging = true;
         startX = e.clientX - posX;
         startY = e.clientY - posY;
         container.style.cursor = 'grabbing';
+        container.setPointerCapture(e.pointerId); // Captura el puntero incluso si sale del contenedor
     });
 
-    window.addEventListener('mousemove', (e) => {
+    container.addEventListener('pointermove', (e) => {
         if (!isDragging) return;
         posX = e.clientX - startX;
         posY = e.clientY - startY;
         container.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
     });
 
-    window.addEventListener('mouseup', () => {
+    container.addEventListener('pointerup', (e) => {
+        if (!isDragging) return;
         isDragging = false;
         container.style.cursor = 'grab';
+        container.releasePointerCapture(e.pointerId);
+    });
+    
+    container.addEventListener('pointercancel', () => {
+        isDragging = false;
     });
 </script>
 </body>
 </html>
-
