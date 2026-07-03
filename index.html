@@ -1,1 +1,289 @@
-OMHNIBUS
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>ÓMHNIBUS - Lienzo de Nodos Inmortal</title>
+    <style>
+        /* --- ESTILOS CORE (Reseteo y Adaptabilidad Líquida) --- */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none; /* Evita selecciones molestas en móviles */
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0b0f19; /* Fondo tecnológico oscuro */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        /* Lienzo elástico que ocupa toda la pantalla física */
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Flotante HUD Estilo Minimalista */
+        .hud-panel {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            padding: 12px 18px;
+            border-radius: 8px;
+            color: #f8fafc;
+            pointer-events: none; /* No interfiere con los clics en el lienzo */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(4px);
+        }
+
+        .hud-panel h1 {
+            font-size: 1.1rem;
+            letter-spacing: 2px;
+            color: #38bdf8;
+            margin-bottom: 4px;
+        }
+
+        .hud-panel p {
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <!-- Panel HUD Informativo adaptable -->
+        <div class="hud-panel">
+            <h1>ÓMHNIBUS</h1>
+            <p>Doble toque/clic: Crear Nodo | Arrastrar: Mover | Shift/Multi-touch: Conectar</p>
+        </div>
+        
+        <!-- El lienzo físico -->
+        <canvas id="lienzoNodos"></canvas>
+    </div>
+
+    <script>
+        // ==========================================
+        //  ÓMHNIBUS - MÓDULO NÚCLEO (ARQUITECTURA)
+        // ==========================================
+
+        const container = document.getElementById('canvas-container');
+        const canvas = document.getElementById('lienzoNodos');
+        const ctx = canvas.getContext('2d');
+
+        // Estado Global del Sistema de Nodos
+        const APP = {
+            nodos: [],
+            conexiones: [],
+            nodoSeleccionado: null,
+            nodoOrigenConexion: null,
+            cursorActual: { x: 0, y: 0 },
+            isDrawingCable: false,
+            lastTouchTime: 0,
+            config: {
+                radioNodo: 35,
+                colorNodo: '#1e293b',
+                colorBorde: '#38bdf8',
+                colorTexto: '#f8fafc',
+                lineaCable: '#0ea5e9'
+            }
+        };
+
+        // --- SISTEMA DE RESOLUCIÓN DINÁMICA (Ajuste de Pantalla) ---
+        function ajustarPantalla() {
+            // Ajuste nativo de pixeles para evitar que se vea borroso en pantallas Retina/High-DPI
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = container.clientWidth * dpr;
+            canvas.height = container.clientHeight * dpr;
+            ctx.scale(dpr, dpr);
+            
+            // Forzar renderizado inmediato al redimensionar
+            render();
+        }
+
+        window.addEventListener('resize', ajustarPantalla);
+
+        // ==========================================
+        //  MÓDULO LÓGICA DE INTERACCIÓN (EVENTOS)
+        // ==========================================
+
+        // Obtiene coordenadas correctas sin importar el escalado o dispositivo
+        function getCoordenadas(e) {
+            const rect = canvas.getBoundingClientRect();
+            // Soporta tanto Mouse como Touches nativos mediante PointerEvents
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
+
+        // Detector de colisión (¿Se tocó un nodo?)
+        function detectarNodoEnPosicion(x, y) {
+            // Buscamos a la inversa para seleccionar siempre el que esté "encima" visualmente
+            for (let i = APP.nodos.length - 1; i >= 0; i--) {
+                const nodo = APP.nodos[i];
+                const distancia = Math.hypot(nodo.x - x, nodo.y - y);
+                if (distancia <= APP.config.radioNodo) {
+                    return nodo;
+                }
+            }
+            return null;
+        }
+
+        // Manejadores unificados de Entrada (Pointer Events = Mouse + Touch + Stylus)
+        canvas.addEventListener('pointerdown', (e) => {
+            const coords = getCoordenadas(e);
+            const nodoTocado = detectarNodoEnPosicion(coords.x, coords.y);
+
+            // DETECTOR DE DOBLE TOQUE/CLIC (Creación de Nodos)
+            const ahora = Date.now();
+            const DIFERENCIA_TIEMPO = ahora - APP.lastTouchTime;
+            APP.lastTouchTime = ahora;
+
+            if (DIFERENCIA_TIEMPO < 300) {
+                // Doble toque detectado
+                if (!nodoTocado) {
+                    APP.nodos.push({
+                        id: Date.now(),
+                        x: coords.x,
+                        y: coords.y,
+                        texto: `Nodo ${APP.nodos.length + 1}`
+                    });
+                    render();
+                }
+                return;
+            }
+
+            // GESTIÓN DE SELECCIÓN, MOVIMIENTO Y CONEXIÓN
+            if (nodoTocado) {
+                // Si presionas SHIFT o dejas presionado (Simulación móvil mediante lógica modular), creas cable
+                if (e.shiftKey || e.button === 2) { 
+                    APP.isDrawingCable = true;
+                    APP.nodoOrigenConexion = nodoTocado;
+                } else {
+                    APP.nodoSeleccionado = nodoTocado;
+                }
+            }
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+            const coords = getCoordenadas(e);
+            APP.cursorActual = coords;
+
+            if (APP.nodoSeleccionado) {
+                // Mover nodo seleccionado fluidamente con el dedo/mouse
+                APP.nodoSeleccionado.x = coords.x;
+                APP.nodoSeleccionado.y = coords.y;
+                render();
+            } else if (APP.isDrawingCable) {
+                // Redibujar el cable elástico en tiempo real
+                render();
+            }
+        });
+
+        canvas.addEventListener('pointerup', (e) => {
+            const coords = getCoordenadas(e);
+
+            if (APP.isDrawingCable && APP.nodoOrigenConexion) {
+                const nodoDestino = detectarNodoEnPosicion(coords.x, coords.y);
+                // Evitamos conectar un nodo consigo mismo o duplicar conexiones existentes
+                if (nodoDestino && nodoDestino.id !== APP.nodoOrigenConexion.id) {
+                    const yaExiste = APP.conexiones.some(c => 
+                        (c.desde === APP.nodoOrigenConexion.id && c.hasta === nodoDestino.id) ||
+                        (c.desde === nodoDestino.id && c.hasta === APP.nodoOrigenConexion.id)
+                    );
+                    if (!yaExiste) {
+                        APP.conexiones.push({
+                            desde: APP.nodoOrigenConexion.id,
+                            hasta: nodoDestino.id
+                        });
+                    }
+                }
+            }
+
+            // Limpieza de estados de arrastre
+            APP.nodoSeleccionado = null;
+            APP.isDrawingCable = false;
+            APP.nodoOrigenConexion = null;
+            render();
+        });
+
+        // Evitar el menú contextual del clic derecho para usarlo como disparador de cables en PC
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+        // ==========================================
+        //  MÓDULO GRÁFICO (RENDER DE ALTA VELOCIDAD)
+        // ==========================================
+
+        function render() {
+            // 1. Limpiar lienzo completo
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 2. Dibujar Conexiones Existentes (Cables estables)
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = APP.config.lineaCable;
+            APP.conexiones.forEach(conexion => {
+                const origen = APP.nodos.find(n => n.id === conexion.desde);
+                const destino = APP.nodos.find(n => n.id === conexion.hasta);
+                
+                if (origen && destino) {
+                    ctx.beginPath();
+                    ctx.moveTo(origen.x, origen.y);
+                    ctx.lineTo(destino.x, destino.y);
+                    ctx.stroke();
+                }
+            });
+
+            // 3. Dibujar Cable Fantasma Elástico (En proceso de creación)
+            if (APP.isDrawingCable && APP.nodoOrigenConexion) {
+                ctx.beginPath();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+                ctx.setLineDash([6, 4]); // Línea punteada dinámica
+                ctx.moveTo(APP.nodoOrigenConexion.x, APP.nodoOrigenConexion.y);
+                ctx.lineTo(APP.cursorActual.x, APP.cursorActual.y);
+                ctx.stroke();
+                ctx.setLineDash([]); // Resetear patrón
+            }
+
+            // 4. Dibujar Nodos
+            APP.nodos.forEach(nodo => {
+                // Cuerpo del Nodo
+                ctx.beginPath();
+                ctx.arc(nodo.x, nodo.y, APP.config.radioNodo, 0, Math.PI * 2);
+                ctx.fillStyle = APP.config.colorNodo;
+                ctx.fill();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = APP.config.colorBorde;
+                ctx.stroke();
+
+                // Texto Interno
+                ctx.fillStyle = APP.config.colorTexto;
+                ctx.font = '12px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(nodo.texto, nodo.x, nodo.y);
+            });
+        }
+
+        // --- ARRANQUE EN CALIENTE DE LA APP ---
+        ajustarPantalla();
+
+    </script>
+</body>
+</html>
+
