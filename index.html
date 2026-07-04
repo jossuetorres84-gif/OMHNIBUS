@@ -39,7 +39,6 @@
 
     <footer id="controls-footer" class="space-y-2">
 
-      <!-- Modo: Manual (tú eliges el motor) vs Auto (ÓMHNIBUS elige el motor según la instrucción) -->
       <div class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
         <span class="text-slate-400 pl-1 font-mono">Modo:</span>
         <select id="router-mode-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
@@ -53,14 +52,13 @@
         <span id="council-btn-text" class="text-slate-400">ÓMHNIBUS COUNCIL: DESACTIVADO</span>
       </button>
 
-      <!-- Selector de motor manual: solo se usa si Modo = Manual y Council está desactivado -->
       <div id="manual-engine-row" class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
         <span class="text-slate-400 pl-1 font-mono">Motor:</span>
         <select id="engine-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
           <option value="gemini">Gemini 3.5 Flash</option>
-          <option value="openai">OpenAI GPT-4o-mini</option>
           <option value="groq">Groq</option>
-          <option value="openrouter">OpenRouter</option>
+          <option value="openrouter">OpenRouter (gratis)</option>
+          <option value="openai">OpenAI (requiere billing)</option>
         </select>
       </div>
 
@@ -82,12 +80,9 @@
       <div class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
         <span class="text-slate-400 pl-1 font-mono">OpenRouter Model:</span>
         <select id="openrouter-model-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
-          <option value="openai/gpt-4o-mini">openai/gpt-4o-mini</option>
-          <option value="anthropic/claude-3.5-sonnet">anthropic/claude-3.5-sonnet</option>
-          <option value="google/gemini-2.0-flash-001">google/gemini-2.0-flash-001</option>
-          <option value="meta-llama/llama-3.3-70b-instruct">meta-llama/llama-3.3-70b-instruct</option>
-          <option value="qwen/qwen-2.5-coder-32b-instruct">qwen/qwen-2.5-coder-32b-instruct</option>
-          <option value="deepseek/deepseek-chat">deepseek/deepseek-chat</option>
+          <option value="openrouter/free">openrouter/free (Auto - Recomendado)</option>
+          <option value="meta-llama/llama-3.3-70b-instruct:free">meta-llama/llama-3.3-70b:free</option>
+          <option value="deepseek/deepseek-r1:free">deepseek-r1:free</option>
         </select>
       </div>
 
@@ -158,11 +153,6 @@
     document.getElementById('router-mode-select').addEventListener('change', syncManualRowVisibility);
     syncManualRowVisibility();
 
-    // ── ROUTER INTELIGENTE ────────────────────────────────────────────────
-    // Heurística simple por palabras clave, al estilo de routers tipo
-    // Hermes/Chatly: clasifica la instrucción y elige el motor más adecuado.
-    // No usa IA para clasificar (así no gasta una llamada extra); es basado
-    // en reglas. Se puede afinar agregando más palabras clave por categoría.
     function selectEngineForPrompt(prompt) {
       const p = prompt.toLowerCase();
 
@@ -172,7 +162,7 @@
       const researchKeywords = ['investiga', 'analiza', 'compara', 'explica a fondo', 'resumen extenso', 'fuentes', 'referencias'];
 
       if (codeKeywords.some(k => p.includes(k))) {
-        return { engine: 'openrouter', model: 'qwen/qwen-2.5-coder-32b-instruct', reason: 'tarea de código' };
+        return { engine: 'openrouter', model: 'openrouter/free', reason: 'tarea de código' };
       }
       if (mathKeywords.some(k => p.includes(k))) {
         return { engine: 'groq', model: 'llama-3.3-70b-versatile', reason: 'cálculo / matemáticas' };
@@ -250,7 +240,6 @@
       openrouter: 'OpenRouter'
     };
 
-    // Llama al motor indicado con el modelo indicado (o el que esté seleccionado en su <select>)
     async function callEngine(engine, prompt, forcedModel, reasonSuffix) {
       let label = ENGINE_LABELS[engine];
       let body = { prompt };
@@ -283,9 +272,8 @@
       appendUserMessage(prompt);
 
       if (useCouncil) {
-        // Modo Council: se consultan varios motores en secuencia, sin importar Auto/Manual
+        // Council sin OpenAI: solo motores gratuitos
         await callEngine('gemini', prompt);
-        await callEngine('openai', prompt);
         await callEngine('groq', prompt);
         await callEngine('openrouter', prompt);
         return;
