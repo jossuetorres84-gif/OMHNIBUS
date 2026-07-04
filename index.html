@@ -1,1 +1,309 @@
-ÓMHNIBUS
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ÓMHNIBUS Core Engine</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#0b0f19] text-slate-100 font-sans antialiased">
+  <div class="flex flex-col h-screen max-w-2xl mx-auto p-4 justify-between">
+
+    <header class="flex justify-between items-center py-2 border-b border-slate-800">
+      <div class="flex items-center gap-2">
+        <h1 class="text-xl font-bold tracking-widest text-teal-400">ÓMHNIBUS</h1>
+        <span id="router-status" class="text-[10px] bg-teal-950 text-teal-400 px-2 py-0.5 rounded-full font-mono border border-teal-800">ROUTER ACTIVO</span>
+      </div>
+      <button onclick="toggleKeyManager()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-teal-300 font-semibold">⚙️ Estado</button>
+    </header>
+
+    <div id="key-manager" class="hidden flex-1 flex flex-col justify-center px-4 space-y-3">
+      <h3 class="text-sm font-semibold text-center text-teal-400">Estado del backend</h3>
+      <p class="text-[11px] text-slate-400 text-center leading-relaxed">
+        Las API keys viven como variables de entorno en el servidor (Vercel &gt; Settings &gt; Environment Variables):
+      </p>
+      <div class="text-[11px] font-mono bg-slate-900 border border-slate-800 rounded-lg p-3 space-y-1">
+        <div>GEMINI_API_KEY</div>
+        <div>OPENAI_API_KEY</div>
+        <div>GROQ_API_KEY</div>
+        <div>OPENROUTER_API_KEY</div>
+      </div>
+      <div id="health-status" class="text-[10px] text-center font-mono text-slate-500">Pulsa "Verificar" para comprobar los nodos.</div>
+      <button onclick="checkHealth()" class="w-full bg-teal-600 hover:bg-teal-500 text-white py-2 rounded-lg text-xs font-semibold">Verificar nodos</button>
+    </div>
+
+    <main id="chat-screen" class="flex-1 overflow-y-auto my-4 space-y-4 pr-1 text-sm scroll-smooth">
+      <div id="empty-notice" class="text-center text-slate-600 mt-20 text-xs px-4">Ecosistema listo. Lanza una instrucción.</div>
+      <div id="messages-container" class="space-y-4 flex flex-col"></div>
+    </main>
+
+    <footer id="controls-footer" class="space-y-2">
+
+      <!-- Modo: Manual (tú eliges el motor) vs Auto (ÓMHNIBUS elige el motor según la instrucción) -->
+      <div class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
+        <span class="text-slate-400 pl-1 font-mono">Modo:</span>
+        <select id="router-mode-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
+          <option value="auto">🧠 Auto (Router Inteligente)</option>
+          <option value="manual">🎛️ Manual</option>
+        </select>
+      </div>
+
+      <button id="council-toggle-btn" class="w-full bg-slate-900 border border-slate-800 py-2 rounded-xl flex items-center justify-center gap-2 text-xs font-semibold transition-all">
+        <span class="w-2 h-2 rounded-full bg-slate-500" id="council-indicator"></span>
+        <span id="council-btn-text" class="text-slate-400">ÓMHNIBUS COUNCIL: DESACTIVADO</span>
+      </button>
+
+      <!-- Selector de motor manual: solo se usa si Modo = Manual y Council está desactivado -->
+      <div id="manual-engine-row" class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
+        <span class="text-slate-400 pl-1 font-mono">Motor:</span>
+        <select id="engine-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
+          <option value="gemini">Gemini 3.5 Flash</option>
+          <option value="openai">OpenAI GPT-4o-mini</option>
+          <option value="groq">Groq</option>
+          <option value="openrouter">OpenRouter</option>
+        </select>
+      </div>
+
+      <div class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
+        <span class="text-slate-400 pl-1 font-mono">Groq Model:</span>
+        <select id="groq-model-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
+          <option value="openai/gpt-oss-120b">openai/gpt-oss-120b (Recomendado)</option>
+          <option value="openai/gpt-oss-20b">openai/gpt-oss-20b</option>
+          <option value="meta-llama/llama-4-scout-17b-16e-instruct">meta-llama/llama-4-scout-17b</option>
+          <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
+          <option value="llama-3.1-8b-instant">llama-3.1-8b-instant</option>
+          <option value="qwen/qwen3-32b">qwen/qwen3-32b</option>
+          <option value="groq/compound">groq/compound</option>
+          <option value="groq/compound-mini">groq/compound-mini</option>
+          <option value="openai/gpt-oss-safeguard-20b">openai/gpt-oss-safeguard-20b</option>
+        </select>
+      </div>
+
+      <div class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
+        <span class="text-slate-400 pl-1 font-mono">OpenRouter Model:</span>
+        <select id="openrouter-model-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
+          <option value="openai/gpt-4o-mini">openai/gpt-4o-mini</option>
+          <option value="anthropic/claude-3.5-sonnet">anthropic/claude-3.5-sonnet</option>
+          <option value="google/gemini-2.0-flash-001">google/gemini-2.0-flash-001</option>
+          <option value="meta-llama/llama-3.3-70b-instruct">meta-llama/llama-3.3-70b-instruct</option>
+          <option value="qwen/qwen-2.5-coder-32b-instruct">qwen/qwen-2.5-coder-32b-instruct</option>
+          <option value="deepseek/deepseek-chat">deepseek/deepseek-chat</option>
+        </select>
+      </div>
+
+      <div class="flex gap-2">
+        <input type="text" id="user-input" placeholder="Escribe tu instrucción..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500">
+        <button id="launch-btn" class="bg-teal-600 hover:bg-teal-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold">Lanzar</button>
+      </div>
+    </footer>
+
+  </div>
+
+  <script>
+    function toggleKeyManager() {
+      const manager = document.getElementById('key-manager');
+      const chat = document.getElementById('chat-screen');
+      const isHidden = manager.classList.toggle('hidden');
+      if (!isHidden) { chat.style.display = 'none'; } else { chat.style.display = 'block'; }
+    }
+
+    async function checkHealth() {
+      const statusEl = document.getElementById('health-status');
+      statusEl.innerText = 'Verificando...';
+      const results = [];
+      for (const [name, path] of [['Gemini', '/api/gemini'], ['OpenAI', '/api/openai'], ['Groq', '/api/groq'], ['OpenRouter', '/api/openrouter']]) {
+        try {
+          const res = await fetch(path, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: 'ping' })
+          });
+          const data = await res.json();
+          results.push(`${name}: ${res.ok ? '🟢 OK' : '🔴 ' + (data.error || 'error')}`);
+        } catch (err) {
+          results.push(`${name}: 🔴 sin conexión`);
+        }
+      }
+      statusEl.innerText = results.join(' | ');
+    }
+
+    let useCouncil = false;
+    document.getElementById('council-toggle-btn').addEventListener('click', () => {
+      useCouncil = !useCouncil;
+      const indicator = document.getElementById('council-indicator');
+      const text = document.getElementById('council-btn-text');
+      const manualRow = document.getElementById('manual-engine-row');
+      if (useCouncil) {
+        indicator.className = "w-2 h-2 rounded-full bg-amber-400 animate-pulse";
+        text.innerText = 'ÓMHNIBUS COUNCIL: MODO SECUENCIAL ACTIVO';
+        text.className = 'text-amber-400 font-semibold';
+        manualRow.classList.add('hidden');
+      } else {
+        indicator.className = "w-2 h-2 rounded-full bg-slate-500";
+        text.innerText = 'ÓMHNIBUS COUNCIL: DESACTIVADO';
+        text.className = 'text-slate-400';
+        syncManualRowVisibility();
+      }
+    });
+
+    function syncManualRowVisibility() {
+      const mode = document.getElementById('router-mode-select').value;
+      const manualRow = document.getElementById('manual-engine-row');
+      if (!useCouncil && mode === 'manual') {
+        manualRow.classList.remove('hidden');
+      } else {
+        manualRow.classList.add('hidden');
+      }
+    }
+    document.getElementById('router-mode-select').addEventListener('change', syncManualRowVisibility);
+    syncManualRowVisibility();
+
+    // ── ROUTER INTELIGENTE ────────────────────────────────────────────────
+    // Heurística simple por palabras clave, al estilo de routers tipo
+    // Hermes/Chatly: clasifica la instrucción y elige el motor más adecuado.
+    // No usa IA para clasificar (así no gasta una llamada extra); es basado
+    // en reglas. Se puede afinar agregando más palabras clave por categoría.
+    function selectEngineForPrompt(prompt) {
+      const p = prompt.toLowerCase();
+
+      const codeKeywords = ['código', 'function', 'bug', 'script', 'programa', 'python', 'javascript', 'error de', 'compila', 'html', 'css', 'api', 'json', 'sql'];
+      const mathKeywords = ['calcula', 'cuánto es', 'ecuación', 'resuelve', 'suma', 'resta', 'multiplica', 'divide', 'porcentaje', 'estadística'];
+      const speedKeywords = ['rápido', 'urgente', 'ya', 'corto', 'breve'];
+      const researchKeywords = ['investiga', 'analiza', 'compara', 'explica a fondo', 'resumen extenso', 'fuentes', 'referencias'];
+
+      if (codeKeywords.some(k => p.includes(k))) {
+        return { engine: 'openrouter', model: 'qwen/qwen-2.5-coder-32b-instruct', reason: 'tarea de código' };
+      }
+      if (mathKeywords.some(k => p.includes(k))) {
+        return { engine: 'groq', model: 'llama-3.3-70b-versatile', reason: 'cálculo / matemáticas' };
+      }
+      if (speedKeywords.some(k => p.includes(k))) {
+        return { engine: 'groq', model: 'llama-3.1-8b-instant', reason: 'prioridad velocidad' };
+      }
+      if (researchKeywords.some(k => p.includes(k))) {
+        return { engine: 'gemini', model: null, reason: 'investigación / análisis extenso' };
+      }
+      return { engine: 'gemini', model: null, reason: 'uso general (por defecto)' };
+    }
+
+    function createEngineBlock(name) {
+      const div = document.createElement('div');
+      div.className = 'p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs space-y-1 my-1 max-w-[90%] self-start w-full shadow-md';
+      div.innerHTML = `
+        <div class="flex justify-between items-center border-b border-slate-800 pb-1">
+          <span class="font-bold text-teal-400">🤖 ${name}</span>
+          <span class="text-[9px] text-amber-400 animate-pulse font-mono tracking-wider">CONECTANDO...</span>
+        </div>
+        <div class="mt-1 text-slate-300 whitespace-pre-wrap leading-relaxed">Procesando transmisión de datos...</div>`;
+      document.getElementById('messages-container').appendChild(div);
+      const screen = document.getElementById('chat-screen');
+      screen.scrollTop = screen.scrollHeight;
+      return { content: div.children[1], status: div.children[0].children[1] };
+    }
+
+    function appendUserMessage(text) {
+      const container = document.getElementById('messages-container');
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'p-3 rounded-2xl max-w-[85%] bg-teal-600 text-white ml-auto whitespace-pre-wrap text-sm shadow-md my-1 self-end';
+      msgDiv.innerText = text;
+      container.appendChild(msgDiv);
+    }
+
+    function markOnline(ui) {
+      ui.status.innerText = "🟢 NODO ONLINE";
+      ui.status.className = "text-[9px] text-green-400 font-mono";
+    }
+    function markWarning(ui) {
+      ui.status.innerText = "🔴 ADVERTENCIA";
+      ui.status.className = "text-[9px] text-amber-400 font-mono";
+    }
+    function markError(ui) {
+      ui.status.innerText = "🔴 ERROR";
+      ui.status.className = "text-[9px] text-red-500 font-mono";
+    }
+
+    async function callProvider(path, ui, body) {
+      try {
+        const res = await fetch(path, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (res.ok && data.text) {
+          ui.content.innerText = data.text;
+          markOnline(ui);
+        } else {
+          ui.content.innerText = 'Error: ' + (data.error || 'respuesta vacía del servidor.');
+          markWarning(ui);
+        }
+      } catch (err) {
+        ui.content.innerText = 'Fallo de conexión con el backend (' + path + '): ' + err.message;
+        markError(ui);
+      }
+    }
+
+    const ENGINE_LABELS = {
+      gemini: 'Gemini 3.5 Flash',
+      openai: 'OpenAI GPT-4o-mini',
+      groq: 'Groq',
+      openrouter: 'OpenRouter'
+    };
+
+    // Llama al motor indicado con el modelo indicado (o el que esté seleccionado en su <select>)
+    async function callEngine(engine, prompt, forcedModel, reasonSuffix) {
+      let label = ENGINE_LABELS[engine];
+      let body = { prompt };
+
+      if (engine === 'groq') {
+        const m = forcedModel || document.getElementById('groq-model-select').value;
+        body.model = m;
+        label = `Groq (${m.split('/').pop()})`;
+      } else if (engine === 'openrouter') {
+        const m = forcedModel || document.getElementById('openrouter-model-select').value;
+        body.model = m;
+        label = `OpenRouter (${m.split('/').pop()})`;
+      } else if (engine === 'openai') {
+        body.model = 'gpt-4o-mini';
+      }
+
+      if (reasonSuffix) label += ` — ${reasonSuffix}`;
+
+      const ui = createEngineBlock(label);
+      await callProvider(`/api/${engine}`, ui, body);
+    }
+
+    document.getElementById('launch-btn').onclick = async () => {
+      const inputEl = document.getElementById('user-input');
+      const prompt = inputEl.value.trim();
+      if (!prompt) return;
+
+      inputEl.value = '';
+      document.getElementById('empty-notice').classList.add('hidden');
+      appendUserMessage(prompt);
+
+      if (useCouncil) {
+        // Modo Council: se consultan varios motores en secuencia, sin importar Auto/Manual
+        await callEngine('gemini', prompt);
+        await callEngine('openai', prompt);
+        await callEngine('groq', prompt);
+        await callEngine('openrouter', prompt);
+        return;
+      }
+
+      const mode = document.getElementById('router-mode-select').value;
+      if (mode === 'auto') {
+        const choice = selectEngineForPrompt(prompt);
+        await callEngine(choice.engine, prompt, choice.model, `router: ${choice.reason}`);
+      } else {
+        const engine = document.getElementById('engine-select').value;
+        await callEngine(engine, prompt);
+      }
+    };
+
+    document.getElementById('user-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('launch-btn').click();
+    });
+  </script>
+</body>
+</html>
