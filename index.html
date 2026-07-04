@@ -1,4 +1,4 @@
-     <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -39,6 +39,24 @@
         <span class="w-2 h-2 rounded-full bg-slate-500" id="council-indicator"></span>
         <span id="council-btn-text" class="text-slate-400">ÓMHNIBUS COUNCIL: DESACTIVADO</span>
       </button>
+
+      <!-- Selector de Modelos Groq Añadido Basado en capturas 1000480724 y 1000480725 -->
+      <div class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
+        <span class="text-slate-400 pl-1 font-mono">Groq Model:</span>
+        <select id="groq-model-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
+          <option value="openai/gpt-oss-120b">openai/gpt-oss-120b (Recomendado)</option>
+          <option value="openai/gpt-oss-20b">openai/gpt-oss-20b</option>
+          <option value="meta-llama/llama-4-scout-17b-16e-instruct">meta-llama/llama-4-scout-17b</option>
+          <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
+          <option value="llama-3.1-8b-instant">llama-3.1-8b-instant</option>
+          <option value="qwen/qwen3-32b">qwen/qwen3-32b</option>
+          <option value="qwen/qwen3.6-27b">qwen/qwen3.6-27b</option>
+          <option value="groq/compound">groq/compound</option>
+          <option value="groq/compound-mini">groq/compound-mini</option>
+          <option value="openai/gpt-oss-safeguard-20b">openai/gpt-oss-safeguard-20b</option>
+        </select>
+      </div>
+
       <div class="flex gap-2">
         <input type="text" id="user-input" placeholder="Escribe tu instrucción..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500">
         <button id="launch-btn" class="bg-teal-600 hover:bg-teal-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold">Lanzar</button>
@@ -54,8 +72,7 @@
       groq: localStorage.getItem('_om_key_groq') || ''
     };
 
-    // Proxy CORS para evitar bloqueos en llamadas directas desde navegadores móviles
-    const corsProxy = "https://api.allorigins.win/get?url=";
+    const corsProxy = "https://corsproxy.io/?";
 
     document.getElementById('key-gemini').value = keys.gemini;
     document.getElementById('key-openai').value = keys.openai;
@@ -65,8 +82,10 @@
     document.getElementById('debug-keys').innerText = `Nodos: Gemini (${keys.gemini?'OK':'NO'}) | Groq (${keys.groq?'OK':'NO'})`;
 
     function toggleKeyManager() {
-      const isHidden = document.getElementById('key-manager').classList.toggle('hidden');
-      document.getElementById('chat-screen').classList.toggle('hidden', !isHidden);
+      const manager = document.getElementById('key-manager');
+      const chat = document.getElementById('chat-screen');
+      const isHidden = manager.classList.toggle('hidden');
+      if (!isHidden) { chat.style.display = 'none'; } else { chat.style.display = 'block'; }
     }
 
     function saveAllKeys() {
@@ -82,7 +101,6 @@
       useCouncil = !useCouncil;
       const indicator = document.getElementById('council-indicator');
       const text = document.getElementById('council-btn-text');
-      
       if(useCouncil) {
         indicator.className = "w-2 h-2 rounded-full bg-amber-400 animate-pulse";
         text.innerText = 'ÓMHNIBUS COUNCIL: MODO SECUENCIAL ACTIVO';
@@ -104,10 +122,8 @@
         </div>
         <div class="mt-1 text-slate-300 whitespace-pre-wrap leading-relaxed">Procesando transmisión de datos...</div>`;
       document.getElementById('messages-container').appendChild(div);
-      
       const screen = document.getElementById('chat-screen');
       screen.scrollTop = screen.scrollHeight;
-      
       return { content: div.children[1], status: div.children[0].children[1] };
     }
 
@@ -119,7 +135,7 @@
       container.appendChild(msgDiv);
     }
 
-    // MANTENIDO INTACTO: Tu endpoint funcional de Gemini 3.5 Flash
+    // MANTENIDO EN PRODUCCIÓN: Endpoint Gemini 3.5 Flash intacto
     async function fetchGemini(prompt) {
       const ui = createEngineBlock('Gemini 3.5 Flash');
       if (!keys.gemini) { ui.content.innerText = "Falta llave de Gemini."; ui.status.innerText = "⚠️ VACÍO"; return; }
@@ -127,9 +143,7 @@
         const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-3.5-flash:generateContent?key=${keys.gemini}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }]
-          })
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
         const data = await res.json();
         if(data.candidates && data.candidates[0].content.parts[0].text) {
@@ -141,7 +155,44 @@
           ui.status.innerText = "🔴 ADVERTENCIA";
         }
       } catch (err) { 
-        ui.content.innerText = "Error de conexión de red con el nodo Gemini 3.5."; 
+        ui.content.innerText = "Error de conexión con el nodo Gemini 3.5."; 
+        ui.status.innerText = "🔴 ERROR";
+        ui.status.className = "text-[9px] text-red-500 font-mono";
+      }
+    }
+
+    // ACTUALIZADO: Envío directo con proxy limpio y lectura del Dropdown dinámico
+    async function fetchGroq(prompt) {
+      const selectedModel = document.getElementById('groq-model-select').value;
+      const ui = createEngineBlock(`Groq (${selectedModel.split('/').pop()})`);
+      if (!keys.groq) { ui.content.innerText = "Falta llave de Groq."; ui.status.innerText = "⚠️ VACÍO"; return; }
+      try {
+        const targetUrl = 'https://api.groq.com/openai/v1/chat/completions';
+        
+        const res = await fetch(corsProxy + encodeURIComponent(targetUrl), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${keys.groq}`
+          },
+          body: JSON.stringify({ 
+            model: selectedModel, 
+            messages: [{ role: 'user', content: prompt }] 
+          })
+        });
+
+        const data = await res.json();
+
+        if (data.choices && data.choices[0].message.content) {
+          ui.content.innerText = data.choices[0].message.content;
+          ui.status.innerText = "🟢 NODO ONLINE";
+          ui.status.className = "text-[9px] text-green-400 font-mono";
+        } else {
+          ui.content.innerText = "Error en respuesta Groq: " + JSON.stringify(data);
+          ui.status.innerText = "🔴 ADVERTENCIA";
+        }
+      } catch (err) { 
+        ui.content.innerText = "Error crítico de bypass CORS con Groq."; 
         ui.status.innerText = "🔴 ERROR";
         ui.status.className = "text-[9px] text-red-500 font-mono";
       }
@@ -151,7 +202,7 @@
       const ui = createEngineBlock('OpenAI GPT-4o-mini');
       if (!keys.openai) { ui.content.innerText = "Falta llave de OpenAI."; ui.status.innerText = "⚠️ VACÍO"; return; }
       try {
-        const res = await fetch(`https://api.openai.com/v1/chat/completions`, {
+        const res = await fetch(corsProxy + encodeURIComponent('https://api.openai.com/v1/chat/completions'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.openai}` },
           body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] })
@@ -163,50 +214,6 @@
       } catch (err) { 
         ui.content.innerText = "Error en canal OpenAI."; 
         ui.status.innerText = "🔴 ERROR";
-      }
-    }
-
-    // RESTAURADO: Canal de Groq protegido contra fallos de CORS
-    async function fetchGroq(prompt) {
-      const ui = createEngineBlock('Groq Llama 3.3 70B');
-      if (!keys.groq) { ui.content.innerText = "Falta llave de Groq."; ui.status.innerText = "⚠️ VACÍO"; return; }
-      try {
-        const targetUrl = 'https://api.groq.com/openai/v1/chat/completions';
-        const payload = {
-          model: 'llama-3.3-70b-versatile',
-          messages: [{ role: 'user', content: prompt }]
-        };
-
-        const res = await fetch(corsProxy + encodeURIComponent(targetUrl), {
-          method: 'POST',
-          headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-          },
-          body: JSON.stringify({
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${keys.groq}`
-            },
-            body: JSON.stringify(payload)
-          })
-        });
-
-        const outerData = await res.json();
-        const data = JSON.parse(outerData.contents);
-
-        if (data.choices && data.choices[0].message.content) {
-          ui.content.innerText = data.choices[0].message.content;
-          ui.status.innerText = "🟢 NODO ONLINE";
-          ui.status.className = "text-[9px] text-green-400 font-mono";
-        } else {
-          ui.content.innerText = "Error en Groq: " + JSON.stringify(data);
-          ui.status.innerText = "🔴 ADVERTENCIA";
-        }
-      } catch (err) { 
-        ui.content.innerText = "Error de comunicación en pasarela Groq."; 
-        ui.status.innerText = "🔴 ERROR";
-        ui.status.className = "text-[9px] text-red-500 font-mono";
       }
     }
 
@@ -230,4 +237,3 @@
   </script>
 </body>
 </html>
-               
