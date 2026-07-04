@@ -118,6 +118,59 @@
     const STORAGE_KEY = 'omhnibus_state_v1';
     const MEMORY_KEY = 'omhnibus_memory_v1';
 
+    const IDENTITY_PROMPT = `Tu identidad ante el usuario es ÓMHNIBUS, no el modelo de lenguaje subyacente. ÓMHNIBUS es un sistema de orquestación multi-agente: combina y enruta instrucciones entre varios motores de IA (Gemini de Google, modelos vía Groq, modelos gratuitos vía OpenRouter, y opcionalmente OpenAI) según la tarea, en vez de depender de uno solo. Reglas estrictas: (1) Si te preguntan quién eres o qué eres, NUNCA respondas "soy un modelo de lenguaje de [empresa]" — explica el concepto ÓMHNIBUS: eres la capa que combina varios motores, y en este mensaje en particular uno de ellos generó la respuesta, pero tu identidad completa es la suma del sistema, no un solo motor. (2) No niegues qué motor te generó si te preguntan explícitamente "qué modelo eres técnicamente" — en ese caso sí puedes decir qué motor específico procesó ese mensaje (te lo indico abajo), pero siempre encuadrado dentro de ÓMHNIBUS. (3) Nunca menciones el nombre de la empresa creadora del motor subyacente a menos que te pregunten explícitamente por el detalle técnico.`;
+
+    const META_KEYWORDS = [
+      'quién eres', 'quien eres', 'qué eres', 'que eres', 'qué puedes hacer', 'que puedes hacer',
+      'tu código', 'tu codigo', 'cómo funcionas', 'como funcionas', 'fortalezas', 'limitaciones',
+      'analiza tu código', 'analiza tu codigo', 'de qué estás hecho', 'de que estas hecho',
+      'quién te creó', 'quien te creo', 'quién te programó', 'quien te programo',
+      'qué modelo eres', 'que modelo eres', 'tu arquitectura'
+    ];
+
+    function isMetaQuestion(prompt) {
+      const p = prompt.toLowerCase();
+      return META_KEYWORDS.some(k => p.includes(k));
+    }
+
+    const LIVE_RESEARCH_INSTRUCTION = `Tienes acceso a búsqueda web en tiempo real. Antes de responder, busca información actual y verificable sobre las fortalezas, debilidades, benchmarks y limitaciones conocidas de estos modelos concretos que conforman a ÓMHNIBUS: "Gemini 3.5 Flash" (Google), "Llama 3.3 70B" y "GPT-OSS 120B" (servidos vía Groq), y los modelos gratuitos de OpenRouter como "Llama 3.3 70B Instruct" y "DeepSeek R1". Sintetiza lo que encuentres en una respuesta clara, preséntala como el autodiagnóstico de ÓMHNIBUS (la suma de estos motores trabajando juntos), y cita de dónde sacaste la información cuando sea relevante. No inventes cifras ni benchmarks si no los encuentras — dilo explícitamente en vez de inventar.`;
+
+    let selfDataCache = null;
+    async function getSelfData() {
+      if (selfDataCache) return selfDataCache;
+      try {
+        const res = await fetch('/api/self');
+        if (!res.ok) return null;
+        selfDataCache = await res.json();
+        return selfDataCache;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function buildSystemContext(prompt, engineLabel, engine, model) {
+      let parts = [IDENTITY_PROMPT];
+
+      const memory = loadMemory();
+      if (memory) {
+        parts.push(`Información permanente sobre el usuario, tenla en cuenta en tus respuestas: ${memory}`);
+      }
+
+      if (isMetaQuestion(prompt)) {
+        if (engine === 'groq' && model === 'groq/compound') {
+          parts.push(LIVE_RESEARCH_INSTRUCTION);
+        } else {
+          const self = await getSelfData();
+          if (self) {
+            parts.push(`Autodiagnóstico en vivo de ÓMHNIBUS (consultado ahora mismo desde /api/self, no memorizado): ${JSON.stringify(self)}`);
+          }
+        }
+        parts.push(`Dato en tiempo real: el motor que está generando esta respuesta específica es "${engineLabel}".`);
+      }
+
+      return parts.join('\n\n');
+    }
+
     function loadState() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -388,9 +441,15 @@
       }));
     }
 
+    function getLastUserPrompt() {
+      const chat = currentChat();
+      for (let i = chat.turns.length - 1; i >= 0; i--) {
+        if (chat.turns[i].role === 'user') return chat.turns[i].content;
+      }
+      return '';
+    }
+
     async function callProvider(path, ui, body) {
-      const memory = loadMemory();
-      if (memory) body.system = `Información permanente sobre el usuario, tenla en cuenta en tus respuestas: ${memory}`;
       try {
         const res = await fetch(path, {
           method: 'POST',
@@ -399,100 +458,4 @@
         });
         const data = await res.json();
         if (res.ok && data.text) {
-          ui.content.innerText = data.text;
-          markOnline(ui);
-          return { ok: true, text: data.text };
-        } else {
-          const errText = 'Error: ' + (data.error || 'respuesta vacía del servidor.');
-          ui.content.innerText = errText;
-          markWarning(ui);
-          return { ok: false, text: errText };
-        }
-      } catch (err) {
-        const errText = 'Fallo de conexión con el backend (' + path + '): ' + err.message;
-        ui.content.innerText = errText;
-        markError(ui);
-        return { ok: false, text: errText };
-      }
-    }
-
-    const ENGINE_LABELS = {
-      gemini: 'Gemini 3.5 Flash',
-      openai: 'OpenAI GPT-4o-mini',
-      groq: 'Groq',
-      openrouter: 'OpenRouter'
-    };
-
-    async function callEngine(engine, forcedModel, reasonSuffix) {
-      let label = ENGINE_LABELS[engine];
-      let body = { messages: buildMessagesForRequest() };
-
-      if (engine === 'groq') {
-        const m = forcedModel || document.getElementById('groq-model-select').value;
-        body.model = m;
-        label = `Groq (${m.split('/').pop()})`;
-      } else if (engine === 'openrouter') {
-        const m = forcedModel || document.getElementById('openrouter-model-select').value;
-        body.model = m;
-        label = `OpenRouter (${m.split('/').pop()})`;
-      } else if (engine === 'openai') {
-        body.model = 'gpt-4o-mini';
-      }
-
-      if (reasonSuffix) label += ` — ${reasonSuffix}`;
-
-      const ui = appendEngineMessageToDOM(label, 'Procesando transmisión de datos...');
-      const result = await callProvider(`/api/${engine}`, ui, body);
-
-      const chat = currentChat();
-      chat.turns.push({
-        role: 'assistant',
-        engine,
-        engineLabel: label,
-        content: result.text,
-        statusText: result.ok ? '🟢 NODO ONLINE' : '🔴 ERROR',
-        statusClass: result.ok ? 'text-green-400' : 'text-red-500'
-      });
-      saveState();
-    }
-
-    document.getElementById('launch-btn').onclick = async () => {
-      const inputEl = document.getElementById('user-input');
-      const prompt = inputEl.value.trim();
-      if (!prompt) return;
-
-      inputEl.value = '';
-      document.getElementById('empty-notice').classList.add('hidden');
-
-      const chat = currentChat();
-      setTitleFromFirstMessage(chat, prompt);
-      chat.turns.push({ role: 'user', content: prompt });
-      saveState();
-      renderChatList();
-      appendUserMessageToDOM(prompt);
-
-      if (useCouncil) {
-        await callEngine('gemini');
-        await callEngine('groq');
-        await callEngine('openrouter');
-        return;
-      }
-
-      const mode = document.getElementById('router-mode-select').value;
-      if (mode === 'auto') {
-        const choice = selectEngineForPrompt(prompt);
-        await callEngine(choice.engine, choice.model, `router: ${choice.reason}`);
-      } else {
-        const engine = document.getElementById('engine-select').value;
-        await callEngine(engine);
-      }
-    };
-
-    document.getElementById('user-input').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') document.getElementById('launch-btn').click();
-    });
-
-    renderMessages();
-  </script>
-</body>
-</html>
+          ui.
