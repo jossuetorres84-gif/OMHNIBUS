@@ -11,25 +11,45 @@
 
     <header class="flex justify-between items-center py-2 border-b border-slate-800">
       <div class="flex items-center gap-2">
+        <button onclick="toggleChatList()" class="text-lg px-1 text-slate-300">☰</button>
         <h1 class="text-xl font-bold tracking-widest text-teal-400">ÓMHNIBUS</h1>
-        <span id="router-status" class="text-[10px] bg-teal-950 text-teal-400 px-2 py-0.5 rounded-full font-mono border border-teal-800">ROUTER ACTIVO</span>
       </div>
-      <button onclick="toggleKeyManager()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-teal-300 font-semibold">⚙️ Estado</button>
+      <div class="flex items-center gap-2">
+        <button onclick="createNewChat()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-teal-300 font-semibold">+ Chat</button>
+        <button onclick="toggleKeyManager()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-teal-300 font-semibold">⚙️</button>
+      </div>
     </header>
 
-    <div id="key-manager" class="hidden flex-1 flex flex-col justify-center px-4 space-y-3">
-      <h3 class="text-sm font-semibold text-center text-teal-400">Estado del backend</h3>
-      <p class="text-[11px] text-slate-400 text-center leading-relaxed">
-        Las API keys viven como variables de entorno en el servidor (Vercel &gt; Settings &gt; Environment Variables):
-      </p>
-      <div class="text-[11px] font-mono bg-slate-900 border border-slate-800 rounded-lg p-3 space-y-1">
-        <div>GEMINI_API_KEY</div>
-        <div>OPENAI_API_KEY</div>
-        <div>GROQ_API_KEY</div>
-        <div>OPENROUTER_API_KEY</div>
+    <div id="chat-list-panel" class="hidden flex-1 overflow-y-auto my-2 space-y-2">
+      <h3 class="text-sm font-semibold text-teal-400 px-1">Tus chats</h3>
+      <div id="chat-list-items" class="space-y-1"></div>
+    </div>
+
+    <div id="key-manager" class="hidden flex-1 overflow-y-auto my-2 px-1 space-y-4">
+      <div class="space-y-3">
+        <h3 class="text-sm font-semibold text-center text-teal-400">Estado del backend</h3>
+        <p class="text-[11px] text-slate-400 text-center leading-relaxed">
+          Las API keys viven como variables de entorno en el servidor (Vercel &gt; Settings &gt; Environment Variables):
+        </p>
+        <div class="text-[11px] font-mono bg-slate-900 border border-slate-800 rounded-lg p-3 space-y-1">
+          <div>GEMINI_API_KEY</div>
+          <div>OPENAI_API_KEY</div>
+          <div>GROQ_API_KEY</div>
+          <div>OPENROUTER_API_KEY</div>
+        </div>
+        <div id="health-status" class="text-[10px] text-center font-mono text-slate-500">Pulsa "Verificar" para comprobar los nodos.</div>
+        <button onclick="checkHealth()" class="w-full bg-teal-600 hover:bg-teal-500 text-white py-2 rounded-lg text-xs font-semibold">Verificar nodos</button>
       </div>
-      <div id="health-status" class="text-[10px] text-center font-mono text-slate-500">Pulsa "Verificar" para comprobar los nodos.</div>
-      <button onclick="checkHealth()" class="w-full bg-teal-600 hover:bg-teal-500 text-white py-2 rounded-lg text-xs font-semibold">Verificar nodos</button>
+
+      <div class="space-y-2 border-t border-slate-800 pt-4">
+        <h3 class="text-sm font-semibold text-center text-teal-400">Memoria permanente</h3>
+        <p class="text-[11px] text-slate-400 text-center leading-relaxed">
+          Se aplica a TODOS tus chats (nuevos y existentes). Úsala para datos fijos sobre ti que quieras que ÓMHNIBUS siempre tenga en cuenta.
+        </p>
+        <textarea id="memory-textarea" rows="4" placeholder="Ej: Me llamo Jossué, soy estudiante de medicina en Ecuador, prefiero respuestas breves y en español..." class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-teal-500"></textarea>
+        <button onclick="saveMemory()" class="w-full bg-teal-600 hover:bg-teal-500 text-white py-2 rounded-lg text-xs font-semibold">Guardar memoria</button>
+        <div id="memory-status" class="text-[10px] text-center font-mono text-slate-500"></div>
+      </div>
     </div>
 
     <main id="chat-screen" class="flex-1 overflow-y-auto my-4 space-y-4 pr-1 text-sm scroll-smooth">
@@ -95,23 +115,148 @@
   </div>
 
   <script>
+    const STORAGE_KEY = 'omhnibus_state_v1';
+    const MEMORY_KEY = 'omhnibus_memory_v1';
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (e) { /* si está corrupto, se recrea abajo */ }
+      const firstId = 'chat_' + Date.now();
+      return {
+        chats: {
+          [firstId]: { id: firstId, title: 'Nuevo chat', createdAt: Date.now(), turns: [] }
+        },
+        currentChatId: firstId
+      };
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    let state = loadState();
+
+    function loadMemory() {
+      return localStorage.getItem(MEMORY_KEY) || '';
+    }
+
+    function saveMemory() {
+      const val = document.getElementById('memory-textarea').value.trim();
+      localStorage.setItem(MEMORY_KEY, val);
+      const statusEl = document.getElementById('memory-status');
+      statusEl.innerText = '🟢 Memoria guardada — se aplicará en tu próximo mensaje.';
+      setTimeout(() => { statusEl.innerText = ''; }, 3000);
+    }
+
+    function currentChat() {
+      return state.chats[state.currentChatId];
+    }
+
+    function createNewChat() {
+      const id = 'chat_' + Date.now();
+      state.chats[id] = { id, title: 'Nuevo chat', createdAt: Date.now(), turns: [] };
+      state.currentChatId = id;
+      saveState();
+      renderChatList();
+      renderMessages();
+      document.getElementById('chat-list-panel').classList.add('hidden');
+      document.getElementById('chat-screen').style.display = 'block';
+    }
+
+    function switchChat(id) {
+      state.currentChatId = id;
+      saveState();
+      renderChatList();
+      renderMessages();
+      document.getElementById('chat-list-panel').classList.add('hidden');
+      document.getElementById('chat-screen').style.display = 'block';
+    }
+
+    function deleteChat(id, event) {
+      event.stopPropagation();
+      if (!confirm('¿Eliminar este chat? Esta acción no se puede deshacer.')) return;
+
+      delete state.chats[id];
+
+      const remainingIds = Object.keys(state.chats);
+      if (remainingIds.length === 0) {
+        const newId = 'chat_' + Date.now();
+        state.chats[newId] = { id: newId, title: 'Nuevo chat', createdAt: Date.now(), turns: [] };
+        state.currentChatId = newId;
+      } else if (state.currentChatId === id) {
+        remainingIds.sort((a, b) => state.chats[b].createdAt - state.chats[a].createdAt);
+        state.currentChatId = remainingIds[0];
+      }
+
+      saveState();
+      renderChatList();
+      renderMessages();
+    }
+
+    function renderChatList() {
+      const container = document.getElementById('chat-list-items');
+      container.innerHTML = '';
+      const ids = Object.keys(state.chats).sort((a, b) => state.chats[b].createdAt - state.chats[a].createdAt);
+
+      for (const id of ids) {
+        const chat = state.chats[id];
+        const isActive = id === state.currentChatId;
+        const item = document.createElement('div');
+        item.className = `flex items-center justify-between gap-2 p-2.5 rounded-lg border cursor-pointer text-xs ${isActive ? 'bg-teal-950 border-teal-700 text-teal-300' : 'bg-slate-900 border-slate-800 text-slate-300'}`;
+        item.onclick = () => switchChat(id);
+
+        const label = document.createElement('span');
+        label.className = 'truncate flex-1';
+        label.innerText = chat.title;
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'text-red-400 px-1.5 shrink-0';
+        delBtn.innerText = '🗑';
+        delBtn.onclick = (e) => deleteChat(id, e);
+
+        item.appendChild(label);
+        item.appendChild(delBtn);
+        container.appendChild(item);
+      }
+    }
+
+    function setTitleFromFirstMessage(chat, text) {
+      if (chat.title === 'Nuevo chat') {
+        chat.title = text.length > 40 ? text.slice(0, 40) + '…' : text;
+      }
+    }
+
+    function toggleChatList() {
+      const panel = document.getElementById('chat-list-panel');
+      const chat = document.getElementById('chat-screen');
+      document.getElementById('key-manager').classList.add('hidden');
+      const isHidden = panel.classList.toggle('hidden');
+      chat.style.display = isHidden ? 'block' : 'none';
+      if (!isHidden) renderChatList();
+    }
+
     function toggleKeyManager() {
       const manager = document.getElementById('key-manager');
       const chat = document.getElementById('chat-screen');
+      document.getElementById('chat-list-panel').classList.add('hidden');
       const isHidden = manager.classList.toggle('hidden');
-      if (!isHidden) { chat.style.display = 'none'; } else { chat.style.display = 'block'; }
+      chat.style.display = isHidden ? 'block' : 'none';
+      if (!isHidden) document.getElementById('memory-textarea').value = loadMemory();
     }
 
     async function checkHealth() {
       const statusEl = document.getElementById('health-status');
       statusEl.innerText = 'Verificando...';
       const results = [];
+      const pingBody = { messages: [{ role: 'user', content: 'ping' }] };
       for (const [name, path] of [['Gemini', '/api/gemini'], ['OpenAI', '/api/openai'], ['Groq', '/api/groq'], ['OpenRouter', '/api/openrouter']]) {
         try {
           const res = await fetch(path, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: 'ping' })
+            body: JSON.stringify(pingBody)
           });
           const data = await res.json();
           results.push(`${name}: ${res.ok ? '🟢 OK' : '🔴 ' + (data.error || 'error')}`);
@@ -176,27 +321,50 @@
       return { engine: 'gemini', model: null, reason: 'uso general (por defecto)' };
     }
 
-    function createEngineBlock(name) {
-      const div = document.createElement('div');
-      div.className = 'p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs space-y-1 my-1 max-w-[90%] self-start w-full shadow-md';
-      div.innerHTML = `
-        <div class="flex justify-between items-center border-b border-slate-800 pb-1">
-          <span class="font-bold text-teal-400">🤖 ${name}</span>
-          <span class="text-[9px] text-amber-400 animate-pulse font-mono tracking-wider">CONECTANDO...</span>
-        </div>
-        <div class="mt-1 text-slate-300 whitespace-pre-wrap leading-relaxed">Procesando transmisión de datos...</div>`;
-      document.getElementById('messages-container').appendChild(div);
+    function renderMessages() {
+      const container = document.getElementById('messages-container');
+      container.innerHTML = '';
+      const chat = currentChat();
+      const emptyNotice = document.getElementById('empty-notice');
+
+      if (!chat || chat.turns.length === 0) {
+        emptyNotice.classList.remove('hidden');
+      } else {
+        emptyNotice.classList.add('hidden');
+        for (const turn of chat.turns) {
+          if (turn.role === 'user') {
+            appendUserMessageToDOM(turn.content);
+          } else {
+            appendEngineMessageToDOM(turn.engineLabel || turn.engine || 'IA', turn.content, turn.statusText, turn.statusClass);
+          }
+        }
+      }
       const screen = document.getElementById('chat-screen');
       screen.scrollTop = screen.scrollHeight;
-      return { content: div.children[1], status: div.children[0].children[1] };
     }
 
-    function appendUserMessage(text) {
+    function appendUserMessageToDOM(text) {
       const container = document.getElementById('messages-container');
       const msgDiv = document.createElement('div');
       msgDiv.className = 'p-3 rounded-2xl max-w-[85%] bg-teal-600 text-white ml-auto whitespace-pre-wrap text-sm shadow-md my-1 self-end';
       msgDiv.innerText = text;
       container.appendChild(msgDiv);
+    }
+
+    function appendEngineMessageToDOM(name, content, statusText, statusClass) {
+      const container = document.getElementById('messages-container');
+      const div = document.createElement('div');
+      div.className = 'p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs space-y-1 my-1 max-w-[90%] self-start w-full shadow-md';
+      div.innerHTML = `
+        <div class="flex justify-between items-center border-b border-slate-800 pb-1">
+          <span class="font-bold text-teal-400">🤖 ${name}</span>
+          <span class="text-[9px] font-mono tracking-wider ${statusClass || 'text-amber-400 animate-pulse'}">${statusText || 'CONECTANDO...'}</span>
+        </div>
+        <div class="mt-1 text-slate-300 whitespace-pre-wrap leading-relaxed">${content}</div>`;
+      container.appendChild(div);
+      const screen = document.getElementById('chat-screen');
+      screen.scrollTop = screen.scrollHeight;
+      return { content: div.children[1], status: div.children[0].children[1] };
     }
 
     function markOnline(ui) {
@@ -212,7 +380,17 @@
       ui.status.className = "text-[9px] text-red-500 font-mono";
     }
 
+    function buildMessagesForRequest() {
+      const chat = currentChat();
+      return chat.turns.map(t => ({
+        role: t.role === 'user' ? 'user' : 'assistant',
+        content: t.engineLabel ? `[${t.engineLabel}] ${t.content}` : t.content
+      }));
+    }
+
     async function callProvider(path, ui, body) {
+      const memory = loadMemory();
+      if (memory) body.system = `Información permanente sobre el usuario, tenla en cuenta en tus respuestas: ${memory}`;
       try {
         const res = await fetch(path, {
           method: 'POST',
@@ -223,13 +401,18 @@
         if (res.ok && data.text) {
           ui.content.innerText = data.text;
           markOnline(ui);
+          return { ok: true, text: data.text };
         } else {
-          ui.content.innerText = 'Error: ' + (data.error || 'respuesta vacía del servidor.');
+          const errText = 'Error: ' + (data.error || 'respuesta vacía del servidor.');
+          ui.content.innerText = errText;
           markWarning(ui);
+          return { ok: false, text: errText };
         }
       } catch (err) {
-        ui.content.innerText = 'Fallo de conexión con el backend (' + path + '): ' + err.message;
+        const errText = 'Fallo de conexión con el backend (' + path + '): ' + err.message;
+        ui.content.innerText = errText;
         markError(ui);
+        return { ok: false, text: errText };
       }
     }
 
@@ -240,9 +423,9 @@
       openrouter: 'OpenRouter'
     };
 
-    async function callEngine(engine, prompt, forcedModel, reasonSuffix) {
+    async function callEngine(engine, forcedModel, reasonSuffix) {
       let label = ENGINE_LABELS[engine];
-      let body = { prompt };
+      let body = { messages: buildMessagesForRequest() };
 
       if (engine === 'groq') {
         const m = forcedModel || document.getElementById('groq-model-select').value;
@@ -258,8 +441,19 @@
 
       if (reasonSuffix) label += ` — ${reasonSuffix}`;
 
-      const ui = createEngineBlock(label);
-      await callProvider(`/api/${engine}`, ui, body);
+      const ui = appendEngineMessageToDOM(label, 'Procesando transmisión de datos...');
+      const result = await callProvider(`/api/${engine}`, ui, body);
+
+      const chat = currentChat();
+      chat.turns.push({
+        role: 'assistant',
+        engine,
+        engineLabel: label,
+        content: result.text,
+        statusText: result.ok ? '🟢 NODO ONLINE' : '🔴 ERROR',
+        statusClass: result.ok ? 'text-green-400' : 'text-red-500'
+      });
+      saveState();
     }
 
     document.getElementById('launch-btn').onclick = async () => {
@@ -269,29 +463,36 @@
 
       inputEl.value = '';
       document.getElementById('empty-notice').classList.add('hidden');
-      appendUserMessage(prompt);
+
+      const chat = currentChat();
+      setTitleFromFirstMessage(chat, prompt);
+      chat.turns.push({ role: 'user', content: prompt });
+      saveState();
+      renderChatList();
+      appendUserMessageToDOM(prompt);
 
       if (useCouncil) {
-        // Council sin OpenAI: solo motores gratuitos
-        await callEngine('gemini', prompt);
-        await callEngine('groq', prompt);
-        await callEngine('openrouter', prompt);
+        await callEngine('gemini');
+        await callEngine('groq');
+        await callEngine('openrouter');
         return;
       }
 
       const mode = document.getElementById('router-mode-select').value;
       if (mode === 'auto') {
         const choice = selectEngineForPrompt(prompt);
-        await callEngine(choice.engine, prompt, choice.model, `router: ${choice.reason}`);
+        await callEngine(choice.engine, choice.model, `router: ${choice.reason}`);
       } else {
         const engine = document.getElementById('engine-select').value;
-        await callEngine(engine, prompt);
+        await callEngine(engine);
       }
     };
 
     document.getElementById('user-input').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') document.getElementById('launch-btn').click();
     });
+
+    renderMessages();
   </script>
 </body>
 </html>
