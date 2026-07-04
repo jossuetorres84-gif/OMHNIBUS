@@ -9,16 +9,80 @@
 <body class="bg-[#0b0f19] text-slate-100 font-sans antialiased">
   <div class="flex flex-col h-screen max-w-2xl mx-auto p-4 justify-between">
 
-    <header class="flex justify-between items-center py-2 border-b border-slate-800">
-      <div class="flex items-center gap-2">
-        <button onclick="toggleChatList()" class="text-lg px-1 text-slate-300">☰</button>
-        <h1 class="text-xl font-bold tracking-widest text-teal-400">ÓMHNIBUS</h1>
+    <header class="flex flex-col gap-2 py-2 border-b border-slate-800">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center gap-2">
+          <button onclick="toggleChatList()" class="text-lg px-1 text-slate-300">☰</button>
+          <h1 class="text-xl font-bold tracking-widest text-teal-400">ÓMHNIBUS</h1>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="toggleProjectManager()" class="text-xs bg-amber-950/40 border border-amber-700/60 rounded-lg px-3 py-1 text-amber-300 font-semibold">📁 Proyectos</button>
+          <button onclick="createNewChat()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-teal-300 font-semibold">+ Chat</button>
+          <button onclick="toggleKeyManager()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-teal-300 font-semibold">⚙️</button>
+        </div>
       </div>
-      <div class="flex items-center gap-2">
-        <button onclick="createNewChat()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-teal-300 font-semibold">+ Chat</button>
-        <button onclick="toggleKeyManager()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-teal-300 font-semibold">⚙️</button>
+      
+      <!-- BARRA DE PROGRESO DE ETAPAS (FASE 4) -->
+      <div id="project-progress-bar" class="hidden w-full bg-slate-950/80 border border-slate-800/80 rounded-lg p-2 text-[10px] space-y-1">
+        <div class="flex justify-between items-center text-slate-400">
+          <span>Proyecto Activo: <strong id="bar-project-name" class="text-teal-400">Ninguno</strong></span>
+          <span>Etapa: <strong id="bar-project-stage" class="text-amber-400">N/A</strong></span>
+        </div>
+        <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden flex">
+          <div id="progress-fill" class="bg-teal-500 h-full transition-all duration-500" style="width: 0%"></div>
+        </div>
+        <div id="progress-steps-labels" class="flex justify-between text-[8px] text-slate-500 font-mono overflow-x-auto gap-2">
+          <span id="step-lbl-constitution">CONSTITUCIÓN</span>
+          <span id="step-lbl-specify">ESPECIFICAR</span>
+          <span id="step-lbl-clarify">ACLARAR</span>
+          <span id="step-lbl-architecture">ARQUITECTURA</span>
+          <span id="step-lbl-plan">PLAN</span>
+          <span id="step-lbl-tasks">TAREAS</span>
+          <span id="step-lbl-implement">EJECUTAR</span>
+        </div>
       </div>
     </header>
+
+    <!-- PANEL DE CONTROL DE PROYECTOS (FASE 2, 3 y 15) -->
+    <div id="project-manager-panel" class="hidden flex-1 overflow-y-auto my-2 space-y-4 px-1">
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-3 space-y-3">
+        <h3 class="text-sm font-semibold text-teal-400">Gestor de Proyectos Inteligentes</h3>
+        <div class="flex gap-2">
+          <input type="text" id="new-project-name" placeholder="Nombre del nuevo proyecto..." class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-teal-500">
+          <button onclick="handleCreateProject()" class="bg-teal-600 hover:bg-teal-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold">Crear</button>
+        </div>
+        <div id="project-list-items" class="space-y-2 mt-2"></div>
+      </div>
+
+      <!-- DETALLE DEL PROYECTO SELECCIONADO -->
+      <div id="active-project-details" class="hidden bg-slate-900/60 border border-slate-800 rounded-xl p-3 space-y-3">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+          <h4 id="details-project-name" class="text-xs font-bold text-teal-300"></h4>
+          <select id="project-stage-select" onchange="handleStageChange()" class="bg-slate-950 text-amber-400 border border-slate-800 rounded px-2 py-0.5 text-[11px] font-mono focus:outline-none">
+            <option value="constitution">1. Constitución</option>
+            <option value="specify">2. Especificar (Specify)</option>
+            <option value="clarify">3. Aclarar (Clarify)</option>
+            <option value="architecture">4. Arquitectura</option>
+            <option value="plan">5. Planificación</option>
+            <option value="tasks">6. Tareas (Backlog)</option>
+            <option value="implement">7. Implementación</option>
+          </select>
+        </div>
+
+        <!-- FORMULARIO DE CONSTITUCIÓN -->
+        <div class="space-y-2">
+          <label class="text-[11px] font-semibold text-slate-400 block">Ficha Técnica del Proyecto (Constitution)</label>
+          <div class="grid grid-cols-2 gap-2">
+            <input type="text" id="proj-lang" placeholder="Lenguaje (Ej: JS, Python)" class="bg-slate-950 border border-slate-800 rounded p-1.5 text-[11px] text-white focus:outline-none">
+            <input type="text" id="proj-framework" placeholder="Framework (Ej: Tailwind)" class="bg-slate-950 border border-slate-800 rounded p-1.5 text-[11px] text-white focus:outline-none">
+            <input type="text" id="proj-db" placeholder="Base de Datos" class="bg-slate-950 border border-slate-800 rounded p-1.5 text-[11px] text-white focus:outline-none">
+            <input type="text" id="proj-rules" placeholder="Reglas críticas" class="bg-slate-950 border border-slate-800 rounded p-1.5 text-[11px] text-white focus:outline-none">
+          </div>
+          <textarea id="proj-objectives" rows="2" placeholder="Objetivos generales del sistema..." class="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-[11px] text-white focus:outline-none"></textarea>
+          <button onclick="handleSaveProjectMeta()" class="w-full bg-amber-600 hover:bg-amber-500 text-white py-1.5 rounded-lg text-xs font-semibold">Sincronizar Estado en Matriz</button>
+        </div>
+      </div>
+    </div>
 
     <div id="chat-list-panel" class="hidden flex-1 overflow-y-auto my-2 space-y-2">
       <h3 class="text-sm font-semibold text-teal-400 px-1">Tus chats</h3>
@@ -46,7 +110,7 @@
         <p class="text-[11px] text-slate-400 text-center leading-relaxed">
           Se aplica a TODOS tus chats (nuevos y existentes). Úsala para datos fijos sobre ti que quieras que ÓMHNIBUS siempre tenga en cuenta.
         </p>
-        <textarea id="memory-textarea" rows="4" placeholder="Ej: Me llamo Jossué, soy estudiante de medicina en Ecuador, prefiero respuestas breves y en español..." class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-teal-500"></textarea>
+        <textarea id="memory-textarea" rows="4" placeholder="Ej: Me llamo Jossué, soy desarrollador de software en Ecuador, prefiero respuestas completas sin simplificaciones de código..." class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-teal-500"></textarea>
         <button onclick="saveMemory()" class="w-full bg-teal-600 hover:bg-teal-500 text-white py-2 rounded-lg text-xs font-semibold">Guardar memoria</button>
         <div id="memory-status" class="text-[10px] text-center font-mono text-slate-500"></div>
       </div>
@@ -120,6 +184,9 @@
   <script>
     const STORAGE_KEY = 'omhnibus_state_v1';
     const MEMORY_KEY = 'omhnibus_memory_v1';
+    const PROJECT_STORAGE_KEY = 'omhnibus_projects_v1'; // Persistencia de proyectos (Fase 15)
+
+    const STAGES = ["constitution", "specify", "clarify", "architecture", "plan", "tasks", "implement"];
 
     const IDENTITY_PROMPT = `Tu identidad ante el usuario es ÓMHNIBUS, no el modelo de lenguaje subyacente. ÓMHNIBUS es un sistema de orquestación multi-agente: combina y enruta instrucciones entre varios motores de IA (Gemini de Google, modelos vía Groq, modelos gratuitos vía OpenRouter, y opcionalmente OpenAI) según la tarea, en vez de depender de uno solo. Reglas estrictas: (1) Si te preguntan quién eres o qué eres, NUNCA respondas "soy un modelo de lenguaje de [empresa]" — explica el concepto ÓMHNIBUS: eres la capa que combina varios motores, y en este mensaje en particular uno de ellos generó la respuesta, pero tu identidad completa es la suma del sistema, no un solo motor. (2) No niegues qué motor te generó si te preguntan explícitamente "qué modelo eres técnicamente" — en ese caso sí puedes decir qué motor específico procesó ese mensaje (te lo indico abajo), pero siempre encuadrado dentro de ÓMHNIBUS. (3) Nunca menciones el nombre de la empresa creadora del motor subyacente a menos que te pregunten explícitamente por el detalle técnico.`;
 
@@ -151,12 +218,43 @@
       }
     }
 
+    // CARGA DE ESTADO DE PROYECTOS (ENGINE CORE DE PROYECTO)
+    function loadProjectState() {
+      try {
+        const raw = localStorage.getItem(PROJECT_STORAGE_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch(e) {}
+      return { projects: {}, activeProjectId: null };
+    }
+
+    function saveProjectState() {
+      localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projectData));
+      updateProgressBar();
+    }
+
+    let projectData = loadProjectState();
+
     async function buildSystemContext(prompt, engineLabel, engine, model) {
       let parts = [IDENTITY_PROMPT];
 
       const memory = loadMemory();
       if (memory) {
         parts.push(`Información permanente sobre el usuario, tenla en cuenta en tus respuestas: ${memory}`);
+      }
+
+      // INYECCIÓN AUTOMÁTICA DEL CONTEXTO DEL PROYECTO VIVO (FASE 15)
+      if (projectData.activeProjectId && projectData.projects[projectData.activeProjectId]) {
+        const proj = projectData.projects[projectData.activeProjectId];
+        parts.push(`[ENTORNO DE PROYECTO ACTIVO EN ÓMHNIBUS]
+Nombre: ${proj.name}
+Etapa Actual: ${proj.stage}
+Ficha Técnica:
+- Lenguaje/Entorno: ${proj.meta.lang || 'No definido'}
+- Frameworks: ${proj.meta.framework || 'No definido'}
+- Base de datos: ${proj.meta.db || 'No definida'}
+- Reglas Críticas: ${proj.meta.rules || 'Ninguna'}
+Objetivos del Proyecto: ${proj.meta.objectives || 'No detallados'}
+Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico obligatoriamente.`);
       }
 
       if (isMetaQuestion(prompt)) {
@@ -218,6 +316,7 @@
       renderChatList();
       renderMessages();
       document.getElementById('chat-list-panel').classList.add('hidden');
+      document.getElementById('project-manager-panel').classList.add('hidden');
       document.getElementById('chat-screen').style.display = 'block';
     }
 
@@ -227,6 +326,7 @@
       renderChatList();
       renderMessages();
       document.getElementById('chat-list-panel').classList.add('hidden');
+      document.getElementById('project-manager-panel').classList.add('hidden');
       document.getElementById('chat-screen').style.display = 'block';
     }
 
@@ -288,6 +388,7 @@
       const panel = document.getElementById('chat-list-panel');
       const chat = document.getElementById('chat-screen');
       document.getElementById('key-manager').classList.add('hidden');
+      document.getElementById('project-manager-panel').classList.add('hidden');
       const isHidden = panel.classList.toggle('hidden');
       chat.style.display = isHidden ? 'block' : 'none';
       if (!isHidden) renderChatList();
@@ -297,9 +398,142 @@
       const manager = document.getElementById('key-manager');
       const chat = document.getElementById('chat-screen');
       document.getElementById('chat-list-panel').classList.add('hidden');
+      document.getElementById('project-manager-panel').classList.add('hidden');
       const isHidden = manager.classList.toggle('hidden');
       chat.style.display = isHidden ? 'block' : 'none';
       if (!isHidden) document.getElementById('memory-textarea').value = loadMemory();
+    }
+
+    // LOGICA COMPLETA DEL GESTOR DE PROYECTOS (FASE 2)
+    function toggleProjectManager() {
+      const manager = document.getElementById('project-manager-panel');
+      const chat = document.getElementById('chat-screen');
+      document.getElementById('chat-list-panel').classList.add('hidden');
+      document.getElementById('key-manager').classList.add('hidden');
+      const isHidden = manager.classList.toggle('hidden');
+      chat.style.display = isHidden ? 'block' : 'none';
+      if (!isHidden) renderProjectList();
+    }
+
+    function handleCreateProject() {
+      const nameInp = document.getElementById('new-project-name');
+      const name = nameInp.value.trim();
+      if (!name) return;
+      const id = 'proj_' + Date.now();
+      projectData.projects[id] = {
+        id,
+        name,
+        stage: 'constitution',
+        meta: { lang: '', framework: '', db: '', rules: '', objectives: '' }
+      };
+      projectData.activeProjectId = id;
+      nameInp.value = '';
+      saveProjectState();
+      renderProjectList();
+    }
+
+    function selectProject(id) {
+      projectData.activeProjectId = id;
+      saveProjectState();
+      renderProjectList();
+    }
+
+    function deleteProject(id, event) {
+      event.stopPropagation();
+      if (!confirm('¿Seguro que deseas eliminar este proyecto y su vinculación contextual?')) return;
+      delete projectData.projects[id];
+      if (projectData.activeProjectId === id) projectData.activeProjectId = null;
+      saveProjectState();
+      renderProjectList();
+    }
+
+    function renderProjectList() {
+      const container = document.getElementById('project-list-items');
+      container.innerHTML = '';
+      const pDetail = document.getElementById('active-project-details');
+      
+      const ids = Object.keys(projectData.projects);
+      if(ids.length === 0) {
+        container.innerHTML = `<div class="text-[11px] text-slate-500 text-center py-2">No hay proyectos activos. Crea uno arriba.</div>`;
+        pDetail.classList.add('hidden');
+        return;
+      }
+
+      ids.forEach(id => {
+        const proj = projectData.projects[id];
+        const isActive = id === projectData.activeProjectId;
+        const div = document.createElement('div');
+        div.className = `flex justify-between items-center p-2 rounded-lg border text-xs cursor-pointer ${isActive ? 'bg-amber-950/40 border-amber-600 text-amber-200' : 'bg-slate-950 border-slate-800 text-slate-400'}`;
+        div.onclick = () => selectProject(id);
+        
+        div.innerHTML = `
+          <div class="flex flex-col truncate">
+            <span class="font-bold truncate">${proj.name}</span>
+            <span class="text-[9px] text-slate-500 font-mono">Etapa: ${proj.stage}</span>
+          </div>
+          <button onclick="deleteProject('${id}', event)" class="text-red-400 font-bold px-1 text-xs">🗑</button>
+        `;
+        container.appendChild(div);
+
+        if (isActive) {
+          pDetail.classList.remove('hidden');
+          document.getElementById('details-project-name').innerText = proj.name.toUpperCase();
+          document.getElementById('project-stage-select').value = proj.stage;
+          document.getElementById('proj-lang').value = proj.meta.lang || '';
+          document.getElementById('proj-framework').value = proj.meta.framework || '';
+          document.getElementById('proj-db').value = proj.meta.db || '';
+          document.getElementById('proj-rules').value = proj.meta.rules || '';
+          document.getElementById('proj-objectives').value = proj.meta.objectives || '';
+        }
+      });
+    }
+
+    function handleStageChange() {
+      if(!projectData.activeProjectId) return;
+      const stage = document.getElementById('project-stage-select').value;
+      projectData.projects[projectData.activeProjectId].stage = stage;
+      saveProjectState();
+    }
+
+    function handleSaveProjectMeta() {
+      if(!projectData.activeProjectId) return;
+      const proj = projectData.projects[projectData.activeProjectId];
+      proj.meta.lang = document.getElementById('proj-lang').value.trim();
+      proj.meta.framework = document.getElementById('proj-framework').value.trim();
+      proj.meta.db = document.getElementById('proj-db').value.trim();
+      proj.meta.rules = document.getElementById('proj-rules').value.trim();
+      proj.meta.objectives = document.getElementById('proj-objectives').value.trim();
+      saveProjectState();
+      alert('Matriz de proyecto sincronizada. ÓMHNIBUS ahora tiene este mapa mental activo.');
+    }
+
+    function updateProgressBar() {
+      const bar = document.getElementById('project-progress-bar');
+      if(!projectData.activeProjectId || !projectData.projects[projectData.activeProjectId]) {
+        bar.classList.add('hidden');
+        return;
+      }
+      bar.classList.remove('hidden');
+      const proj = projectData.projects[projectData.activeProjectId];
+      document.getElementById('bar-project-name').innerText = proj.name;
+      document.getElementById('bar-project-stage').innerText = proj.stage.toUpperCase();
+
+      const idx = STAGES.indexOf(proj.stage);
+      const pct = idx < 0 ? 0 : Math.round(((idx + 1) / STAGES.length) * 100);
+      document.getElementById('progress-fill').style.width = `${pct}%`;
+
+      STAGES.forEach(st => {
+        const lbl = document.getElementById(`step-lbl-${st}`);
+        if(lbl) {
+          if(st === proj.stage) {
+            lbl.className = "text-amber-400 font-bold underline";
+          } else if(STAGES.indexOf(st) < idx) {
+            lbl.className = "text-teal-400 font-semibold";
+          } else {
+            lbl.className = "text-slate-600";
+          }
+        }
+      });
     }
 
     async function checkHealth() {
@@ -741,7 +975,9 @@
       });
     }
 
+    // Inicializar UI al cargar
     renderMessages();
+    updateProgressBar();
   </script>
 </body>
 </html>
