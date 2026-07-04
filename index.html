@@ -1,4 +1,4 @@
-      <!DOCTYPE html>
+     <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -54,14 +54,15 @@
       groq: localStorage.getItem('_om_key_groq') || ''
     };
 
-    const corsProxy = "https://corsproxy.io/?";
+    // Proxy CORS para evitar bloqueos en llamadas directas desde navegadores móviles
+    const corsProxy = "https://api.allorigins.win/get?url=";
 
     document.getElementById('key-gemini').value = keys.gemini;
     document.getElementById('key-openai').value = keys.openai;
     document.getElementById('key-openrouter').value = keys.openrouter;
     document.getElementById('key-groq').value = keys.groq;
     
-    document.getElementById('debug-keys').innerText = `Nodos Activos: Gemini 3.5 (${keys.gemini?'OK':'NO'})`;
+    document.getElementById('debug-keys').innerText = `Nodos: Gemini (${keys.gemini?'OK':'NO'}) | Groq (${keys.groq?'OK':'NO'})`;
 
     function toggleKeyManager() {
       const isHidden = document.getElementById('key-manager').classList.toggle('hidden');
@@ -118,7 +119,7 @@
       container.appendChild(msgDiv);
     }
 
-    // LLAMADA ACTUALIZADA PARA EMITIR A GEMINI 3.5 FLASH DE FORMA DIRECTA
+    // MANTENIDO INTACTO: Tu endpoint funcional de Gemini 3.5 Flash
     async function fetchGemini(prompt) {
       const ui = createEngineBlock('Gemini 3.5 Flash');
       if (!keys.gemini) { ui.content.innerText = "Falta llave de Gemini."; ui.status.innerText = "⚠️ VACÍO"; return; }
@@ -150,7 +151,7 @@
       const ui = createEngineBlock('OpenAI GPT-4o-mini');
       if (!keys.openai) { ui.content.innerText = "Falta llave de OpenAI."; ui.status.innerText = "⚠️ VACÍO"; return; }
       try {
-        const res = await fetch(corsProxy + encodeURIComponent('https://api.openai.com/v1/chat/completions'), {
+        const res = await fetch(`https://api.openai.com/v1/chat/completions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.openai}` },
           body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] })
@@ -160,27 +161,52 @@
         ui.status.innerText = "🟢 NODO ONLINE";
         ui.status.className = "text-[9px] text-green-400 font-mono";
       } catch (err) { 
-        ui.content.innerText = "Error en canal cifrado OpenAI."; 
+        ui.content.innerText = "Error en canal OpenAI."; 
         ui.status.innerText = "🔴 ERROR";
       }
     }
 
+    // RESTAURADO: Canal de Groq protegido contra fallos de CORS
     async function fetchGroq(prompt) {
       const ui = createEngineBlock('Groq Llama 3.3 70B');
       if (!keys.groq) { ui.content.innerText = "Falta llave de Groq."; ui.status.innerText = "⚠️ VACÍO"; return; }
       try {
-        const res = await fetch(corsProxy + encodeURIComponent('https://api.groq.com/openai/v1/chat/completions'), {
+        const targetUrl = 'https://api.groq.com/openai/v1/chat/completions';
+        const payload = {
+          model: 'llama-3.3-70b-versatile',
+          messages: [{ role: 'user', content: prompt }]
+        };
+
+        const res = await fetch(corsProxy + encodeURIComponent(targetUrl), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.groq}` },
-          body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }] })
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: JSON.stringify({
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${keys.groq}`
+            },
+            body: JSON.stringify(payload)
+          })
         });
-        const data = await res.json();
-        ui.content.innerText = data.choices[0].message.content;
-        ui.status.innerText = "🟢 NODO ONLINE";
-        ui.status.className = "text-[9px] text-green-400 font-mono";
+
+        const outerData = await res.json();
+        const data = JSON.parse(outerData.contents);
+
+        if (data.choices && data.choices[0].message.content) {
+          ui.content.innerText = data.choices[0].message.content;
+          ui.status.innerText = "🟢 NODO ONLINE";
+          ui.status.className = "text-[9px] text-green-400 font-mono";
+        } else {
+          ui.content.innerText = "Error en Groq: " + JSON.stringify(data);
+          ui.status.innerText = "🔴 ADVERTENCIA";
+        }
       } catch (err) { 
-        ui.content.innerText = "Error en pasarela Groq."; 
+        ui.content.innerText = "Error de comunicación en pasarela Groq."; 
         ui.status.innerText = "🔴 ERROR";
+        ui.status.className = "text-[9px] text-red-500 font-mono";
       }
     }
 
@@ -204,4 +230,4 @@
   </script>
 </body>
 </html>
-        
+               
