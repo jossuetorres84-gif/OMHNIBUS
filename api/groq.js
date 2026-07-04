@@ -1,6 +1,3 @@
-// api/groq.js
-// Función serverless de Vercel. La API key vive en la variable de entorno GROQ_API_KEY.
-
 const ALLOWED_MODELS = [
   'openai/gpt-oss-120b',
   'openai/gpt-oss-20b',
@@ -19,9 +16,9 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Método no permitido. Usa POST.' });
   }
 
-  const { prompt, model } = req.body || {};
-  if (!prompt || typeof prompt !== 'string') {
-    return res.status(400).json({ error: 'Falta el campo "prompt" en el body.' });
+  const { messages, system, model } = req.body || {};
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({ error: 'Falta el campo "messages" (array) en el body.' });
   }
 
   const apiKey = process.env.GROQ_API_KEY;
@@ -32,6 +29,7 @@ module.exports = async (req, res) => {
   }
 
   const selectedModel = ALLOWED_MODELS.includes(model) ? model : 'openai/gpt-oss-120b';
+  const finalMessages = system ? [{ role: 'system', content: system }, ...messages] : messages;
 
   try {
     const upstream = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -40,10 +38,7 @@ module.exports = async (req, res) => {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
       },
-      body: JSON.stringify({
-        model: selectedModel,
-        messages: [{ role: 'user', content: prompt }]
-      })
+      body: JSON.stringify({ model: selectedModel, messages: finalMessages })
     });
 
     const data = await upstream.json();
