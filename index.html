@@ -76,8 +76,10 @@
         <span class="text-slate-400 pl-1 font-mono">Motor:</span>
         <select id="engine-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
           <option value="gemini">Gemini 3.5 Flash</option>
-          <option value="groq">Groq</option>
-          <option value="openrouter">OpenRouter (gratis)</option>
+          <option value="groq-multi">Groq (multi-modelo, varios expertos)</option>
+          <option value="openrouter-multi">OpenRouter (multi-modelo, varios expertos)</option>
+          <option value="groq">Groq (un solo modelo)</option>
+          <option value="openrouter">OpenRouter (un solo modelo)</option>
           <option value="openai">OpenAI (requiere billing)</option>
         </select>
       </div>
@@ -359,19 +361,32 @@
       const speedKeywords = ['rápido', 'urgente', 'ya', 'corto', 'breve'];
       const researchKeywords = ['investiga', 'analiza', 'compara', 'explica a fondo', 'resumen extenso', 'fuentes', 'referencias'];
 
-      if (codeKeywords.some(k => p.includes(k))) {
-        return { engine: 'openrouter', model: 'openrouter/free', reason: 'tarea de código' };
+      if (codeKeywords.some(k => p.includes(k))) return { category: 'code', engine: 'openrouter', reason: 'tarea de código' };
+      if (mathKeywords.some(k => p.includes(k))) return { category: 'math', engine: 'groq', reason: 'cálculo / matemáticas' };
+      if (speedKeywords.some(k => p.includes(k))) return { category: 'speed', engine: 'groq', reason: 'prioridad velocidad' };
+      if (researchKeywords.some(k => p.includes(k))) return { category: 'research', engine: 'gemini', reason: 'investigación / análisis extenso' };
+      return { category: 'general', engine: 'gemini', reason: 'uso general (por defecto)' };
+    }
+
+    const EXPERTS = {
+      groq: {
+        code: ['qwen/qwen3-32b', 'openai/gpt-oss-120b'],
+        math: ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b'],
+        speed: ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile'],
+        research: ['openai/gpt-oss-120b', 'groq/compound'],
+        general: ['openai/gpt-oss-120b', 'llama-3.3-70b-versatile']
+      },
+      openrouter: {
+        code: ['meta-llama/llama-3.3-70b-instruct:free', 'deepseek/deepseek-r1:free'],
+        math: ['deepseek/deepseek-r1:free', 'openrouter/free'],
+        speed: ['openrouter/free'],
+        research: ['deepseek/deepseek-r1:free', 'meta-llama/llama-3.3-70b-instruct:free'],
+        general: ['openrouter/free', 'meta-llama/llama-3.3-70b-instruct:free']
       }
-      if (mathKeywords.some(k => p.includes(k))) {
-        return { engine: 'groq', model: 'llama-3.3-70b-versatile', reason: 'cálculo / matemáticas' };
-      }
-      if (speedKeywords.some(k => p.includes(k))) {
-        return { engine: 'groq', model: 'llama-3.1-8b-instant', reason: 'prioridad velocidad' };
-      }
-      if (researchKeywords.some(k => p.includes(k))) {
-        return { engine: 'gemini', model: null, reason: 'investigación / análisis extenso' };
-      }
-      return { engine: 'gemini', model: null, reason: 'uso general (por defecto)' };
+    };
+
+    function expertsFor(engine, category) {
+      return (EXPERTS[engine] && EXPERTS[engine][category]) || EXPERTS[engine].general;
     }
 
     function renderMessages() {
@@ -458,4 +473,199 @@
         });
         const data = await res.json();
         if (res.ok && data.text) {
-          ui.
+          ui.content.innerText = data.text;
+          markOnline(ui);
+          return { ok: true, text: data.text };
+        } else {
+          const errText = 'Error: ' + (data.error || 'respuesta vacía del servidor.');
+          ui.content.innerText = errText;
+          markWarning(ui);
+          return { ok: false, text: errText };
+        }
+      } catch (err) {
+        const errText = 'Fallo de conexión con el backend (' + path + '): ' + err.message;
+        ui.content.innerText = errText;
+        markError(ui);
+        return { ok: false, text: errText };
+      }
+    }
+
+    const ENGINE_LABELS = {
+      gemini: 'Gemini 3.5 Flash',
+      openai: 'OpenAI GPT-4o-mini',
+      groq: 'Groq',
+      openrouter: 'OpenRouter'
+    };
+
+    async function callSingleModel(engine, model, messages, system) {
+      try {
+        const res = await fetch(`/api/${engine}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages, model, system })
+        });
+        const data = await res.json();
+        if (res.ok && data.text) return { model, ok: true, text: data.text };
+        return { model, ok: false, text: 'Error: ' + (data.error || 'respuesta vacía del servidor.') };
+      } catch (err) {
+        return { model, ok: false, text: 'Fallo de conexión: ' + err.message };
+      }
+    }
+
+    function appendMultiModelBlock(providerLabel, models, reasonSuffix) {
+      const container = document.getElementById('messages-container');
+      const outer = document.createElement('div');
+      outer.className = 'p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs space-y-2 my-1 max-w-[92%] self-start w-full shadow-md';
+
+      const header = document.createElement('div');
+      header.className = 'font-bold text-teal-400 border-b border-slate-800 pb-1';
+      header.innerText = `🤖 ${providerLabel}${reasonSuffix ? ' — ' + reasonSuffix : ''} (${models.length} expertos)`;
+      outer.appendChild(header);
+
+      const subBlocks = {};
+      for (const m of models) {
+        const sub = document.createElement('div');
+        sub.className = 'border-l-2 border-slate-700 pl-2 space-y-0.5';
+        sub.innerHTML = `
+          <div class="flex justify-between items-center">
+            <span class="text-teal-300 font-semibold">${m.split('/').pop()}</span>
+            <span class="text-[9px] text-amber-400 animate-pulse font-mono">CONECTANDO...</span>
+          </div>
+          <div class="text-slate-300 whitespace-pre-wrap leading-relaxed">Procesando...</div>`;
+        outer.appendChild(sub);
+        subBlocks[m] = { status: sub.children[0].children[1], content: sub.children[1] };
+      }
+
+      container.appendChild(outer);
+      const screen = document.getElementById('chat-screen');
+      screen.scrollTop = screen.scrollHeight;
+      return subBlocks;
+    }
+
+    async function callEngineMulti(engine, models, reasonSuffix) {
+      const providerLabel = engine === 'groq' ? 'Groq' : 'OpenRouter';
+      const label = `${providerLabel} multi-modelo`;
+      const messages = buildMessagesForRequest();
+      const lastPrompt = getLastUserPrompt();
+      const system = await buildSystemContext(lastPrompt, label, engine, models[0]);
+
+      const subBlocks = appendMultiModelBlock(providerLabel, models, reasonSuffix);
+      const resultsForHistory = [];
+
+      await Promise.all(models.map(async (m) => {
+        const result = await callSingleModel(engine, m, messages, system);
+        const ui = subBlocks[m];
+        ui.content.innerText = result.text;
+        ui.status.innerText = result.ok ? '🟢 OK' : '🔴 ERROR';
+        ui.status.className = `text-[9px] font-mono ${result.ok ? 'text-green-400' : 'text-red-500'}`;
+        resultsForHistory.push({ model: m, ok: result.ok, text: result.text });
+      }));
+
+      const combinedContent = resultsForHistory
+        .map(r => `[${providerLabel} - ${r.model.split('/').pop()}]: ${r.text}`)
+        .join('\n\n');
+
+      const chat = currentChat();
+      chat.turns.push({
+        role: 'assistant',
+        engine,
+        engineLabel: `${providerLabel} (multi-modelo: ${models.map(m => m.split('/').pop()).join(', ')})`,
+        content: combinedContent,
+        statusText: '🟢 MULTI-MODELO',
+        statusClass: 'text-green-400'
+      });
+      saveState();
+    }
+
+    async function callEngine(engine, forcedModel, reasonSuffix) {
+      let label = ENGINE_LABELS[engine];
+      let body = { messages: buildMessagesForRequest() };
+
+      if (engine === 'groq') {
+        const m = forcedModel || document.getElementById('groq-model-select').value;
+        body.model = m;
+        label = m === 'groq/compound' ? 'Groq Compound (búsqueda web en vivo)' : `Groq (${m.split('/').pop()})`;
+      } else if (engine === 'openrouter') {
+        const m = forcedModel || document.getElementById('openrouter-model-select').value;
+        body.model = m;
+        label = `OpenRouter (${m.split('/').pop()})`;
+      } else if (engine === 'openai') {
+        body.model = 'gpt-4o-mini';
+      }
+
+      if (reasonSuffix) label += ` — ${reasonSuffix}`;
+
+      const lastPrompt = getLastUserPrompt();
+      body.system = await buildSystemContext(lastPrompt, label, engine, body.model);
+
+      const ui = appendEngineMessageToDOM(label, 'Procesando transmisión de datos...');
+      const result = await callProvider(`/api/${engine}`, ui, body);
+
+      const chat = currentChat();
+      chat.turns.push({
+        role: 'assistant',
+        engine,
+        engineLabel: label,
+        content: result.text,
+        statusText: result.ok ? '🟢 NODO ONLINE' : '🔴 ERROR',
+        statusClass: result.ok ? 'text-green-400' : 'text-red-500'
+      });
+      saveState();
+    }
+
+    document.getElementById('launch-btn').onclick = async () => {
+      const inputEl = document.getElementById('user-input');
+      const prompt = inputEl.value.trim();
+      if (!prompt) return;
+
+      inputEl.value = '';
+      document.getElementById('empty-notice').classList.add('hidden');
+
+      const chat = currentChat();
+      setTitleFromFirstMessage(chat, prompt);
+      chat.turns.push({ role: 'user', content: prompt });
+      saveState();
+      renderChatList();
+      appendUserMessageToDOM(prompt);
+
+      if (isMetaQuestion(prompt) && !useCouncil) {
+        await callEngine('groq', 'groq/compound', 'autodiagnóstico verificado con búsqueda web');
+        return;
+      }
+
+      if (useCouncil) {
+        const { category } = selectEngineForPrompt(prompt);
+        await callEngine('gemini');
+        await callEngineMulti('groq', expertsFor('groq', category), 'council');
+        await callEngineMulti('openrouter', expertsFor('openrouter', category), 'council');
+        return;
+      }
+
+      const mode = document.getElementById('router-mode-select').value;
+      if (mode === 'auto') {
+        const choice = selectEngineForPrompt(prompt);
+        if (choice.engine === 'groq' || choice.engine === 'openrouter') {
+          await callEngineMulti(choice.engine, expertsFor(choice.engine, choice.category), `router: ${choice.reason}`);
+        } else {
+          await callEngine(choice.engine, null, `router: ${choice.reason}`);
+        }
+      } else {
+        const engine = document.getElementById('engine-select').value;
+        if (engine === 'groq-multi' || engine === 'openrouter-multi') {
+          const realEngine = engine.replace('-multi', '');
+          const { category, reason } = selectEngineForPrompt(prompt);
+          await callEngineMulti(realEngine, expertsFor(realEngine, category), `multi-modelo: ${reason}`);
+        } else {
+          await callEngine(engine);
+        }
+      }
+    };
+
+    document.getElementById('user-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('launch-btn').click();
+    });
+
+    renderMessages();
+  </script>
+</body>
+</html>
