@@ -1,15 +1,12 @@
-// OpenRouter da acceso a un solo endpoint con muchísimos modelos (GPT, Claude, Gemini,
-// Llama, Qwen, DeepSeek, etc.) usando UNA sola key: OPENROUTER_API_KEY.
-// Verifica los slugs exactos en https://openrouter.ai/models porque OpenRouter
-// actualiza/retira modelos con frecuencia.
+// OpenRouter ofrece modelos 100% gratis (sufijo :free), sin tarjeta de crédito.
+// "openrouter/free" es un router que elige automáticamente entre los modelos
+// gratuitos disponibles — así nunca se rompe si un modelo específico deja de
+// ser gratis (esto cambia con frecuencia en OpenRouter).
 
 const ALLOWED_MODELS = [
-  'openai/gpt-4o-mini',
-  'anthropic/claude-3.5-sonnet',
-  'google/gemini-2.0-flash-001',
-  'meta-llama/llama-3.3-70b-instruct',
-  'qwen/qwen-2.5-coder-32b-instruct',
-  'deepseek/deepseek-chat'
+  'openrouter/free',
+  'meta-llama/llama-3.3-70b-instruct:free',
+  'deepseek/deepseek-r1:free'
 ];
 
 module.exports = async (req, res) => {
@@ -30,7 +27,7 @@ module.exports = async (req, res) => {
     });
   }
 
-  const selectedModel = ALLOWED_MODELS.includes(model) ? model : 'openai/gpt-4o-mini';
+  const selectedModel = ALLOWED_MODELS.includes(model) ? model : 'openrouter/free';
 
   try {
     const upstream = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -38,8 +35,6 @@ module.exports = async (req, res) => {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
-        // OpenRouter recomienda estos headers para atribución/rankings, no son obligatorios
-        // pero evitan que te limiten. Cambia el valor por tu dominio real.
         'HTTP-Referer': 'https://omhnibus.vercel.app',
         'X-Title': 'ÓMHNIBUS'
       },
