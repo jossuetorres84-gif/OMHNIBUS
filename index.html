@@ -71,6 +71,9 @@
       groq: localStorage.getItem('_om_key_groq') || ''
     };
 
+    // Cambiado a un proxy reverso estricto que clona headers sin destruirlos en llamadas POST
+    const proxyUrl = "https://cors-anywhere.herokuapp.com/";
+
     document.getElementById('key-gemini').value = keys.gemini;
     document.getElementById('key-openai').value = keys.openai;
     document.getElementById('key-openrouter').value = keys.openrouter;
@@ -157,33 +160,29 @@
       }
     }
 
-    // ARQUITECTURA VERIFICADA: El túnel a Groq funciona bien, revisa que la KEY ingresada sea correcta
+    // ARQUITECTURA DIRECTA CON CLONACIÓN DE CABECERAS PARA GROQ
     async function fetchGroq(prompt) {
       const selectedModel = document.getElementById('groq-model-select').value;
       const ui = createEngineBlock(`Groq (${selectedModel.split('/').pop()})`);
       if (!keys.groq) { ui.content.innerText = "Falta llave de Groq."; ui.status.innerText = "⚠️ VACÍO"; return; }
       try {
         const targetUrl = 'https://api.groq.com/openai/v1/chat/completions';
-        const bodyPayload = { 
-          model: selectedModel, 
-          messages: [{ role: 'user', content: prompt }] 
-        };
-
-        const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`, {
+        
+        // El puente se ejecuta enviando los headers de autorización limpios de forma nativa
+        const res = await fetch(proxyUrl + targetUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${keys.groq}`
-            },
-            body: JSON.stringify(bodyPayload)
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${keys.groq.trim()}`,
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: JSON.stringify({ 
+            model: selectedModel, 
+            messages: [{ role: 'user', content: prompt }] 
           })
         });
 
-        const rawData = await res.json();
-        const data = JSON.parse(rawData.contents);
+        const data = await res.json();
 
         if (data.choices && data.choices[0].message.content) {
           ui.content.innerText = data.choices[0].message.content;
@@ -194,41 +193,33 @@
           ui.status.innerText = "🔴 ADVERTENCIA";
         }
       } catch (err) { 
-        ui.content.innerText = "Fallo de encapsulamiento CORS en Groq."; 
+        ui.content.innerText = "Fallo de encapsulamiento CORS en Groq. Si usas cors-anywhere público, es posible que requiera activar el acceso temporal en su web."; 
         ui.status.innerText = "🔴 ERROR";
         ui.status.className = "text-[9px] text-red-500 font-mono";
       }
     }
 
-    // CORREGIDO: Rediseño del puente AllOrigins para peticiones GET limpias sobre APIs REST estrictas
+    // ARQUITECTURA DIRECTA CON CLONACIÓN DE CABECERAS PARA OPENAI
     async function fetchOpenAI(prompt) {
       const ui = createEngineBlock('OpenAI GPT-4o-mini');
       if (!keys.openai) { ui.content.innerText = "Falta llave de OpenAI."; ui.status.innerText = "⚠️ VACÍO"; return; }
       try {
         const targetUrl = 'https://api.openai.com/v1/chat/completions';
-        const bodyPayload = { model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] };
 
-        // Forzamos codificación limpia pasando los parámetros de red serializados dentro del puente
-        const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`, {
+        const res = await fetch(proxyUrl + targetUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${keys.openai.trim()}`
-            },
-            body: JSON.stringify(bodyPayload)
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${keys.openai.trim()}`,
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: JSON.stringify({ 
+            model: 'gpt-4o-mini', 
+            messages: [{ role: 'user', content: prompt }] 
           })
         });
 
-        const rawData = await res.json();
-        
-        if (!rawData.contents) {
-          throw new Error("Transmisión vacía del puente proxy.");
-        }
-
-        const data = JSON.parse(rawData.contents);
+        const data = await res.json();
 
         if (data.choices && data.choices[0].message.content) {
           ui.content.innerText = data.choices[0].message.content;
