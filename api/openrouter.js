@@ -10,9 +10,9 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Método no permitido. Usa POST.' });
   }
 
-  const { prompt, model } = req.body || {};
-  if (!prompt || typeof prompt !== 'string') {
-    return res.status(400).json({ error: 'Falta el campo "prompt" en el body.' });
+  const { messages, system, model } = req.body || {};
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({ error: 'Falta el campo "messages" (array) en el body.' });
   }
 
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -23,6 +23,7 @@ module.exports = async (req, res) => {
   }
 
   const selectedModel = ALLOWED_MODELS.includes(model) ? model : 'openrouter/free';
+  const finalMessages = system ? [{ role: 'system', content: system }, ...messages] : messages;
 
   try {
     const upstream = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -33,10 +34,7 @@ module.exports = async (req, res) => {
         'HTTP-Referer': 'https://omhnibus.vercel.app',
         'X-Title': 'ÓMHNIBUS'
       },
-      body: JSON.stringify({
-        model: selectedModel,
-        messages: [{ role: 'user', content: prompt }]
-      })
+      body: JSON.stringify({ model: selectedModel, messages: finalMessages })
     });
 
     const data = await upstream.json();
