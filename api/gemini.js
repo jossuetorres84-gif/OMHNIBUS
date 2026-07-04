@@ -4,9 +4,9 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Método no permitido. Usa POST.' });
   }
 
-  const { prompt } = req.body || {};
-  if (!prompt || typeof prompt !== 'string') {
-    return res.status(400).json({ error: 'Falta el campo "prompt" en el body.' });
+  const { messages, system } = req.body || {};
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({ error: 'Falta el campo "messages" (array) en el body.' });
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -19,13 +19,29 @@ module.exports = async (req, res) => {
   const model = 'gemini-3.5-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
+  // Gemini exige turnos alternados user/model empezando en 'user'.
+  // Si hay turnos consecutivos del mismo rol (ej. varias respuestas de Council seguidas),
+  // se fusionan en un solo turno para no romper la alternancia.
+  const contents = [];
+  for (const m of messages) {
+    const role = m.role === 'assistant' ? 'model' : 'user';
+    const last = contents[contents.length - 1];
+    if (last && last.role === role) {
+      last.parts[0].text += '\n\n' + m.content;
+    } else {
+      contents.push({ role, parts: [{ text: m.content }] });
+    }
+  }
+  while (contents.length && contents[0].role !== 'user') contents.shift();
+
+  const payload = { contents };
+  if (system) payload.systemInstruction = { parts: [{ text: system }] };
+
   try {
     const upstream = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
-      })
+      body: JSON.stringify(payload)
     });
 
     const data = await upstream.json();
