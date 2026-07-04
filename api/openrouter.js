@@ -1,8 +1,3 @@
-// OpenRouter ofrece modelos 100% gratis (sufijo :free), sin tarjeta de crédito.
-// "openrouter/free" es un router que elige automáticamente entre los modelos
-// gratuitos disponibles — así nunca se rompe si un modelo específico deja de
-// ser gratis (esto cambia con frecuencia en OpenRouter).
-
 const ALLOWED_MODELS = [
   'openrouter/free',
   'meta-llama/llama-3.3-70b-instruct:free',
