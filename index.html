@@ -109,6 +109,7 @@
       </div>
 
       <div class="flex gap-2">
+        <button id="mic-btn" class="bg-slate-900 border border-slate-800 text-teal-300 px-3.5 py-2.5 rounded-xl text-sm">🎤</button>
         <input type="text" id="user-input" placeholder="Escribe tu instrucción..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500">
         <button id="launch-btn" class="bg-teal-600 hover:bg-teal-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold">Lanzar</button>
       </div>
@@ -426,13 +427,18 @@
       div.innerHTML = `
         <div class="flex justify-between items-center border-b border-slate-800 pb-1">
           <span class="font-bold text-teal-400">🤖 ${name}</span>
-          <span class="text-[9px] font-mono tracking-wider ${statusClass || 'text-amber-400 animate-pulse'}">${statusText || 'CONECTANDO...'}</span>
+          <div class="flex items-center gap-2">
+            <button class="speak-btn text-teal-300 text-xs">🔊</button>
+            <span class="text-[9px] font-mono tracking-wider ${statusClass || 'text-amber-400 animate-pulse'}">${statusText || 'CONECTANDO...'}</span>
+          </div>
         </div>
         <div class="mt-1 text-slate-300 whitespace-pre-wrap leading-relaxed">${content}</div>`;
       container.appendChild(div);
+      const contentEl = div.children[1];
+      div.querySelector('.speak-btn').onclick = () => speakText(contentEl.innerText);
       const screen = document.getElementById('chat-screen');
       screen.scrollTop = screen.scrollHeight;
-      return { content: div.children[1], status: div.children[0].children[1] };
+      return { content: contentEl, status: div.children[0].children[1].children[1] };
     }
 
     function markOnline(ui) {
@@ -529,11 +535,17 @@
         sub.innerHTML = `
           <div class="flex justify-between items-center">
             <span class="text-teal-300 font-semibold">${m.split('/').pop()}</span>
-            <span class="text-[9px] text-amber-400 animate-pulse font-mono">CONECTANDO...</span>
+            <div class="flex items-center gap-2">
+              <button class="speak-btn text-teal-300 text-xs">🔊</button>
+              <span class="text-[9px] text-amber-400 animate-pulse font-mono">CONECTANDO...</span>
+            </div>
           </div>
           <div class="text-slate-300 whitespace-pre-wrap leading-relaxed">Procesando...</div>`;
         outer.appendChild(sub);
-        subBlocks[m] = { status: sub.children[0].children[1], content: sub.children[1] };
+        const contentEl = sub.children[1];
+        const statusEl = sub.children[0].children[1].children[1];
+        sub.querySelector('.speak-btn').onclick = () => speakText(contentEl.innerText);
+        subBlocks[m] = { status: statusEl, content: contentEl };
       }
 
       container.appendChild(outer);
@@ -664,6 +676,70 @@
     document.getElementById('user-input').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') document.getElementById('launch-btn').click();
     });
+
+    function speakText(text) {
+      if (!('speechSynthesis' in window)) {
+        alert('Este navegador no soporta síntesis de voz.');
+        return;
+      }
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'es-419';
+      utterance.rate = 1;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const micBtn = document.getElementById('mic-btn');
+    let recognition = null;
+    let isRecording = false;
+
+    if (SpeechRecognitionAPI) {
+      recognition = new SpeechRecognitionAPI();
+      recognition.lang = 'es-419';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => {
+        isRecording = true;
+        micBtn.classList.add('bg-red-600', 'animate-pulse');
+        micBtn.classList.remove('bg-slate-900');
+      };
+
+      recognition.onend = () => {
+        isRecording = false;
+        micBtn.classList.remove('bg-red-600', 'animate-pulse');
+        micBtn.classList.add('bg-slate-900');
+      };
+
+      recognition.onerror = (event) => {
+        isRecording = false;
+        micBtn.classList.remove('bg-red-600', 'animate-pulse');
+        micBtn.classList.add('bg-slate-900');
+        if (event.error !== 'no-speech' && event.error !== 'aborted') {
+          alert('Error de reconocimiento de voz: ' + event.error);
+        }
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        const inputEl = document.getElementById('user-input');
+        inputEl.value = transcript;
+        inputEl.focus();
+      };
+
+      micBtn.addEventListener('click', () => {
+        if (isRecording) {
+          recognition.stop();
+        } else {
+          recognition.start();
+        }
+      });
+    } else {
+      micBtn.addEventListener('click', () => {
+        alert('Este navegador no soporta dictado por voz. Prueba desde Chrome.');
+      });
+    }
 
     renderMessages();
   </script>
