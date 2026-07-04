@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+   <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -40,7 +40,6 @@
         <span id="council-btn-text" class="text-slate-400">ÓMHNIBUS COUNCIL: DESACTIVADO</span>
       </button>
 
-      <!-- Selector de Modelos Groq Añadido Basado en capturas 1000480724 y 1000480725 -->
       <div class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
         <span class="text-slate-400 pl-1 font-mono">Groq Model:</span>
         <select id="groq-model-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
@@ -72,7 +71,8 @@
       groq: localStorage.getItem('_om_key_groq') || ''
     };
 
-    const corsProxy = "https://corsproxy.io/?";
+    // Cambiado a AllOrigins para inyección de POST limpia sin mutación de headers
+    const proxyUrl = "https://api.allorigins.win/get?url=";
 
     document.getElementById('key-gemini').value = keys.gemini;
     document.getElementById('key-openai').value = keys.openai;
@@ -135,7 +135,7 @@
       container.appendChild(msgDiv);
     }
 
-    // MANTENIDO EN PRODUCCIÓN: Endpoint Gemini 3.5 Flash intacto
+    // INTACTO: Tu endpoint estable de Gemini 3.5 Flash
     async function fetchGemini(prompt) {
       const ui = createEngineBlock('Gemini 3.5 Flash');
       if (!keys.gemini) { ui.content.innerText = "Falta llave de Gemini."; ui.status.innerText = "⚠️ VACÍO"; return; }
@@ -161,59 +161,90 @@
       }
     }
 
-    // ACTUALIZADO: Envío directo con proxy limpio y lectura del Dropdown dinámico
+    // CORREGIDO: Bypass por AllOrigins codificando el payload completo para Groq
     async function fetchGroq(prompt) {
       const selectedModel = document.getElementById('groq-model-select').value;
       const ui = createEngineBlock(`Groq (${selectedModel.split('/').pop()})`);
       if (!keys.groq) { ui.content.innerText = "Falta llave de Groq."; ui.status.innerText = "⚠️ VACÍO"; return; }
       try {
         const targetUrl = 'https://api.groq.com/openai/v1/chat/completions';
+        const bodyPayload = { 
+          model: selectedModel, 
+          messages: [{ role: 'user', content: prompt }] 
+        };
+
+        // AllOrigins exige codificar la llamada completa dentro de una query GET para evitar mutaciones de CORS en el navegador
+        const finalUrl = `${proxyUrl}${encodeURIComponent(targetUrl)}&callback=?`;
         
-        const res = await fetch(corsProxy + encodeURIComponent(targetUrl), {
+        const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${keys.groq}`
+            'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ 
-            model: selectedModel, 
-            messages: [{ role: 'user', content: prompt }] 
+          body: JSON.stringify({
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${keys.groq}`
+            },
+            body: JSON.stringify(bodyPayload)
           })
         });
 
-        const data = await res.json();
+        const rawData = await res.json();
+        const data = JSON.parse(rawData.contents);
 
         if (data.choices && data.choices[0].message.content) {
           ui.content.innerText = data.choices[0].message.content;
           ui.status.innerText = "🟢 NODO ONLINE";
           ui.status.className = "text-[9px] text-green-400 font-mono";
         } else {
-          ui.content.innerText = "Error en respuesta Groq: " + JSON.stringify(data);
+          ui.content.innerText = "Error Groq: " + (data.error ? data.error.message : JSON.stringify(data));
           ui.status.innerText = "🔴 ADVERTENCIA";
         }
       } catch (err) { 
-        ui.content.innerText = "Error crítico de bypass CORS con Groq."; 
+        ui.content.innerText = "Fallo de encapsulamiento CORS en Groq."; 
         ui.status.innerText = "🔴 ERROR";
         ui.status.className = "text-[9px] text-red-500 font-mono";
       }
     }
 
+    // CORREGIDO: OpenAI con la misma arquitectura de puente AllOrigins
     async function fetchOpenAI(prompt) {
       const ui = createEngineBlock('OpenAI GPT-4o-mini');
       if (!keys.openai) { ui.content.innerText = "Falta llave de OpenAI."; ui.status.innerText = "⚠️ VACÍO"; return; }
       try {
-        const res = await fetch(corsProxy + encodeURIComponent('https://api.openai.com/v1/chat/completions'), {
+        const targetUrl = 'https://api.openai.com/v1/chat/completions';
+        const bodyPayload = { model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] };
+
+        const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keys.openai}` },
-          body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }] })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${keys.openai}`
+            },
+            body: JSON.stringify(bodyPayload)
+          })
         });
-        const data = await res.json();
-        ui.content.innerText = data.choices[0].message.content;
-        ui.status.innerText = "🟢 NODO ONLINE";
-        ui.status.className = "text-[9px] text-green-400 font-mono";
+
+        const rawData = await res.json();
+        const data = JSON.parse(rawData.contents);
+
+        if (data.choices && data.choices[0].message.content) {
+          ui.content.innerText = data.choices[0].message.content;
+          ui.status.innerText = "🟢 NODO ONLINE";
+          ui.status.className = "text-[9px] text-green-400 font-mono";
+        } else {
+          ui.content.innerText = "Error OpenAI: " + (data.error ? data.error.message : JSON.stringify(data));
+          ui.status.innerText = "🔴 ADVERTENCIA";
+        }
       } catch (err) { 
-        ui.content.innerText = "Error en canal OpenAI."; 
+        ui.content.innerText = "Fallo de encapsulamiento CORS en OpenAI."; 
         ui.status.innerText = "🔴 ERROR";
+        ui.status.className = "text-[9px] text-red-500 font-mono";
       }
     }
 
@@ -237,3 +268,4 @@
   </script>
 </body>
 </html>
+           
