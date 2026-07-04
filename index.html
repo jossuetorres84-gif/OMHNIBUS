@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+    <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -22,7 +22,6 @@
         </div>
       </div>
       
-      <!-- BARRA DE PROGRESO DE ETAPAS (FASE 4) -->
       <div id="project-progress-bar" class="hidden w-full bg-slate-950/80 border border-slate-800/80 rounded-lg p-2 text-[10px] space-y-1">
         <div class="flex justify-between items-center text-slate-400">
           <span>Proyecto Activo: <strong id="bar-project-name" class="text-teal-400">Ninguno</strong></span>
@@ -43,7 +42,6 @@
       </div>
     </header>
 
-    <!-- PANEL DE CONTROL DE PROYECTOS (FASE 2, 3 y 15) -->
     <div id="project-manager-panel" class="hidden flex-1 overflow-y-auto my-2 space-y-4 px-1">
       <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-3 space-y-3">
         <h3 class="text-sm font-semibold text-teal-400">Gestor de Proyectos Inteligentes</h3>
@@ -54,7 +52,6 @@
         <div id="project-list-items" class="space-y-2 mt-2"></div>
       </div>
 
-      <!-- DETALLE DEL PROYECTO SELECCIONADO -->
       <div id="active-project-details" class="hidden bg-slate-900/60 border border-slate-800 rounded-xl p-3 space-y-3">
         <div class="flex justify-between items-center border-b border-slate-800 pb-2">
           <h4 id="details-project-name" class="text-xs font-bold text-teal-300"></h4>
@@ -69,7 +66,6 @@
           </select>
         </div>
 
-        <!-- FORMULARIO DE CONSTITUCIÓN -->
         <div class="space-y-2">
           <label class="text-[11px] font-semibold text-slate-400 block">Ficha Técnica del Proyecto (Constitution)</label>
           <div class="grid grid-cols-2 gap-2">
@@ -184,7 +180,7 @@
   <script>
     const STORAGE_KEY = 'omhnibus_state_v1';
     const MEMORY_KEY = 'omhnibus_memory_v1';
-    const PROJECT_STORAGE_KEY = 'omhnibus_projects_v1'; // Persistencia de proyectos (Fase 15)
+    const PROJECT_STORAGE_KEY = 'omhnibus_projects_v1';
 
     const STAGES = ["constitution", "specify", "clarify", "architecture", "plan", "tasks", "implement"];
 
@@ -218,7 +214,6 @@
       }
     }
 
-    // CARGA DE ESTADO DE PROYECTOS (ENGINE CORE DE PROYECTO)
     function loadProjectState() {
       try {
         const raw = localStorage.getItem(PROJECT_STORAGE_KEY);
@@ -242,7 +237,6 @@
         parts.push(`Información permanente sobre el usuario, tenla en cuenta en tus respuestas: ${memory}`);
       }
 
-      // INYECCIÓN AUTOMÁTICA DEL CONTEXTO DEL PROYECTO VIVO (FASE 15)
       if (projectData.activeProjectId && projectData.projects[projectData.activeProjectId]) {
         const proj = projectData.projects[projectData.activeProjectId];
         parts.push(`[ENTORNO DE PROYECTO ACTIVO EN ÓMHNIBUS]
@@ -404,7 +398,6 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       if (!isHidden) document.getElementById('memory-textarea').value = loadMemory();
     }
 
-    // LOGICA COMPLETA DEL GESTOR DE PROYECTOS (FASE 2)
     function toggleProjectManager() {
       const manager = document.getElementById('project-manager-panel');
       const chat = document.getElementById('chat-screen');
@@ -688,12 +681,28 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       ui.status.className = "text-[9px] text-red-500 font-mono";
     }
 
+    const MAX_CONTEXT_TURNS = 20;
+    const MAX_CONTEXT_CHARS = 12000;
+    const MAX_TURN_CHARS = 3000;
+
     function buildMessagesForRequest() {
       const chat = currentChat();
-      return chat.turns.map(t => ({
-        role: t.role === 'user' ? 'user' : 'assistant',
-        content: t.engineLabel ? `[${t.engineLabel}] ${t.content}` : t.content
-      }));
+      const recent = chat.turns.slice(-MAX_CONTEXT_TURNS);
+
+      const mapped = recent.map(t => {
+        let content = t.engineLabel ? `[${t.engineLabel}] ${t.content}` : t.content;
+        if (content.length > MAX_TURN_CHARS) {
+          content = content.slice(0, MAX_TURN_CHARS) + '\n[...recortado por longitud para no saturar la petición...]';
+        }
+        return { role: t.role === 'user' ? 'user' : 'assistant', content };
+      });
+
+      let totalChars = mapped.reduce((sum, m) => sum + m.content.length, 0);
+      while (totalChars > MAX_CONTEXT_CHARS && mapped.length > 2) {
+        totalChars -= mapped.shift().content.length;
+      }
+
+      return mapped;
     }
 
     function getLastUserPrompt() {
@@ -807,8 +816,14 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
         resultsForHistory.push({ model: m, ok: result.ok, text: result.text });
       }));
 
+      const MAX_SUMMARY_CHARS_PER_MODEL = 600;
       const combinedContent = resultsForHistory
-        .map(r => `[${providerLabel} - ${r.model.split('/').pop()}]: ${r.text}`)
+        .map(r => {
+          const trimmed = r.text.length > MAX_SUMMARY_CHARS_PER_MODEL
+            ? r.text.slice(0, MAX_SUMMARY_CHARS_PER_MODEL) + '…'
+            : r.text;
+          return `[${providerLabel} - ${r.model.split('/').pop()}]: ${trimmed}`;
+        })
         .join('\n\n');
 
       const chat = currentChat();
@@ -975,9 +990,8 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       });
     }
 
-    // Inicializar UI al cargar
     renderMessages();
     updateProgressBar();
   </script>
 </body>
-</html>
+</html>                
