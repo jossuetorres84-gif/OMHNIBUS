@@ -1,4 +1,4 @@
-    <!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -149,10 +149,7 @@
         <select id="groq-model-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
           <option value="openai/gpt-oss-120b">openai/gpt-oss-120b (Recomendado)</option>
           <option value="openai/gpt-oss-20b">openai/gpt-oss-20b</option>
-          <option value="meta-llama/llama-4-scout-17b-16e-instruct">meta-llama/llama-4-scout-17b</option>
-          <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
-          <option value="llama-3.1-8b-instant">llama-3.1-8b-instant</option>
-          <option value="qwen/qwen3-32b">qwen/qwen3-32b</option>
+          <option value="qwen/qwen3.6-27b">qwen/qwen3.6-27b</option>
           <option value="groq/compound">groq/compound</option>
           <option value="groq/compound-mini">groq/compound-mini</option>
           <option value="openai/gpt-oss-safeguard-20b">openai/gpt-oss-safeguard-20b</option>
@@ -263,7 +260,13 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
         parts.push(`Dato en tiempo real: el motor que está generando esta respuesta específica es "${engineLabel}".`);
       }
 
-      return parts.join('\n\n');
+      return capSystemPrompt(parts.join('\n\n'));
+    }
+
+    const MAX_SYSTEM_CHARS = 6000;
+    function capSystemPrompt(text) {
+      if (text.length <= MAX_SYSTEM_CHARS) return text;
+      return text.slice(0, MAX_SYSTEM_CHARS) + '\n[...contexto de sistema recortado por longitud...]';
     }
 
     function loadState() {
@@ -598,18 +601,18 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
 
     const EXPERTS = {
       groq: {
-        code: ['qwen/qwen3-32b', 'openai/gpt-oss-120b'],
-        math: ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b'],
-        speed: ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile'],
+        code: ['qwen/qwen3.6-27b', 'openai/gpt-oss-120b'],
+        math: ['openai/gpt-oss-120b', 'qwen/qwen3.6-27b'],
+        speed: ['openai/gpt-oss-20b', 'openai/gpt-oss-120b'],
         research: ['openai/gpt-oss-120b', 'groq/compound'],
-        general: ['openai/gpt-oss-120b', 'llama-3.3-70b-versatile']
+        general: ['openai/gpt-oss-120b', 'qwen/qwen3.6-27b']
       },
       openrouter: {
-        code: ['meta-llama/llama-3.3-70b-instruct:free', 'deepseek/deepseek-r1:free'],
-        math: ['deepseek/deepseek-r1:free', 'openrouter/free'],
+        code: ['openrouter/free'],
+        math: ['openrouter/free'],
         speed: ['openrouter/free'],
-        research: ['deepseek/deepseek-r1:free', 'meta-llama/llama-3.3-70b-instruct:free'],
-        general: ['openrouter/free', 'meta-llama/llama-3.3-70b-instruct:free']
+        research: ['openrouter/free'],
+        general: ['openrouter/free']
       }
     };
 
@@ -768,7 +771,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
 
       const header = document.createElement('div');
       header.className = 'font-bold text-teal-400 border-b border-slate-800 pb-1';
-      header.innerText = `🤖 ${providerLabel}${reasonSuffix ? ' — ' + reasonSuffix : ''} (${models.length} expertos)`;
+      header.innerText = `🤖 ${providerLabel}${reasonSuffix ? ' — ' + reasonSuffix : ''} (${models.length} ${models.length === 1 ? 'experto' : 'expertos'})`;
       outer.appendChild(header);
 
       const subBlocks = {};
@@ -994,4 +997,4 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
     updateProgressBar();
   </script>
 </body>
-</html>                
+</html>               
