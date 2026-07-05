@@ -174,56 +174,68 @@
 
     <footer id="controls-footer" class="space-y-2">
 
-      <div class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
-        <span class="text-slate-400 pl-1 font-mono">Modo:</span>
-        <select id="router-mode-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
-          <option value="auto">🧠 Auto (Router Inteligente)</option>
-          <option value="manual">🎛️ Manual</option>
-        </select>
+      <div id="settings-bar" class="flex items-center justify-between gap-2 bg-slate-950/60 border border-slate-800/60 rounded-xl px-3 py-2 text-[11px] cursor-pointer" onclick="toggleSettingsPanel()">
+        <span id="settings-summary" class="text-teal-300 font-mono truncate">🧠 Auto</span>
+        <span class="flex items-center gap-1 text-slate-300 text-xs font-semibold shrink-0">
+          <span>⚙️ Opciones</span>
+          <span id="settings-chevron">▾</span>
+        </span>
       </div>
 
-      <button id="council-toggle-btn" class="w-full bg-slate-900 border border-slate-800 py-2 rounded-xl flex items-center justify-center gap-2 text-xs font-semibold transition-all">
-        <span class="w-2 h-2 rounded-full bg-slate-500" id="council-indicator"></span>
-        <span id="council-btn-text" class="text-slate-400">ÓMHNIBUS COUNCIL: DESACTIVADO</span>
-      </button>
+      <div id="settings-panel" class="hidden space-y-2">
 
-      <div id="manual-engine-row" class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
-        <span class="text-slate-400 pl-1 font-mono">Motor:</span>
-        <select id="engine-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
-          <option value="gemini">Gemini 3.5 Flash</option>
-          <option value="groq-multi">Groq (multi-modelo, varios expertos)</option>
-          <option value="openrouter-multi">OpenRouter (multi-modelo, varios expertos)</option>
-          <option value="groq">Groq (un solo modelo)</option>
-          <option value="openrouter">OpenRouter (un solo modelo)</option>
-          <option value="openai">OpenAI (requiere billing)</option>
-        </select>
+        <div class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
+          <span class="text-slate-400 pl-1 font-mono">Modo:</span>
+          <select id="router-mode-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
+            <option value="auto">🧠 Auto (Router Inteligente)</option>
+            <option value="manual">🎛️ Manual</option>
+          </select>
+        </div>
+
+        <button id="council-toggle-btn" class="w-full bg-slate-900 border border-slate-800 py-2 rounded-xl flex items-center justify-center gap-2 text-xs font-semibold transition-all">
+          <span class="w-2 h-2 rounded-full bg-slate-500" id="council-indicator"></span>
+          <span id="council-btn-text" class="text-slate-400">ÓMHNIBUS COUNCIL: DESACTIVADO</span>
+        </button>
+
+        <div id="manual-engine-row" class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
+          <span class="text-slate-400 pl-1 font-mono">Motor:</span>
+          <select id="engine-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
+            <option value="gemini">Gemini 3.5 Flash</option>
+            <option value="groq-multi">Groq (multi-modelo, varios expertos)</option>
+            <option value="openrouter-multi">OpenRouter (multi-modelo, varios expertos)</option>
+            <option value="groq">Groq (un solo modelo)</option>
+            <option value="openrouter">OpenRouter (un solo modelo)</option>
+            <option value="openai">OpenAI (requiere billing)</option>
+          </select>
+        </div>
+
+        <div class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
+          <span class="text-slate-400 pl-1 font-mono">Groq Model:</span>
+          <select id="groq-model-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
+            <option value="openai/gpt-oss-120b">openai/gpt-oss-120b (Recomendado)</option>
+            <option value="openai/gpt-oss-20b">openai/gpt-oss-20b</option>
+            <option value="qwen/qwen3.6-27b">qwen/qwen3.6-27b</option>
+            <option value="groq/compound">groq/compound</option>
+            <option value="groq/compound-mini">groq/compound-mini</option>
+            <option value="openai/gpt-oss-safeguard-20b">openai/gpt-oss-safeguard-20b</option>
+          </select>
+        </div>
+
+        <div class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
+          <span class="text-slate-400 pl-1 font-mono">OpenRouter Model:</span>
+          <select id="openrouter-model-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
+            <option value="openrouter/free">openrouter/free (Auto - Recomendado)</option>
+            <option value="meta-llama/llama-3.3-70b-instruct:free">meta-llama/llama-3.3-70b:free</option>
+            <option value="deepseek/deepseek-r1:free">deepseek-r1:free</option>
+          </select>
+        </div>
+
       </div>
 
-      <div class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
-        <span class="text-slate-400 pl-1 font-mono">Groq Model:</span>
-        <select id="groq-model-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
-          <option value="openai/gpt-oss-120b">openai/gpt-oss-120b (Recomendado)</option>
-          <option value="openai/gpt-oss-20b">openai/gpt-oss-20b</option>
-          <option value="qwen/qwen3.6-27b">qwen/qwen3.6-27b</option>
-          <option value="groq/compound">groq/compound</option>
-          <option value="groq/compound-mini">groq/compound-mini</option>
-          <option value="openai/gpt-oss-safeguard-20b">openai/gpt-oss-safeguard-20b</option>
-        </select>
-      </div>
-
-      <div class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
-        <span class="text-slate-400 pl-1 font-mono">OpenRouter Model:</span>
-        <select id="openrouter-model-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
-          <option value="openrouter/free">openrouter/free (Auto - Recomendado)</option>
-          <option value="meta-llama/llama-3.3-70b-instruct:free">meta-llama/llama-3.3-70b:free</option>
-          <option value="deepseek/deepseek-r1:free">deepseek-r1:free</option>
-        </select>
-      </div>
-
-      <div class="flex gap-2">
-        <button id="mic-btn" class="bg-slate-900 border border-slate-800 text-teal-300 px-3.5 py-2.5 rounded-xl text-sm">🎤</button>
-        <input type="text" id="user-input" placeholder="Escribe tu instrucción..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500">
-        <button id="launch-btn" class="bg-teal-600 hover:bg-teal-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold">Lanzar</button>
+      <div class="flex gap-2 items-end">
+        <button id="mic-btn" class="bg-slate-900 border border-slate-800 text-teal-300 px-3.5 py-2.5 rounded-xl text-sm shrink-0">🎤</button>
+        <textarea id="user-input" rows="1" placeholder="Escribe tu instrucción... (Enter = nueva línea, Ctrl+Enter para enviar)" class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500 resize-none max-h-36 overflow-y-auto leading-snug"></textarea>
+        <button id="launch-btn" class="bg-teal-600 hover:bg-teal-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shrink-0">Lanzar</button>
       </div>
     </footer>
 
@@ -796,6 +808,44 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       statusEl.innerText = results.join(' | ');
     }
 
+    // ===== PANEL DE OPCIONES COLAPSABLE =====
+    function toggleSettingsPanel() {
+      const panel = document.getElementById('settings-panel');
+      const chevron = document.getElementById('settings-chevron');
+      const isHidden = panel.classList.toggle('hidden');
+      chevron.innerText = isHidden ? '▾' : '▴';
+    }
+
+    const ENGINE_SUMMARY_LABELS = {
+      gemini: 'Gemini 3.5 Flash',
+      'groq-multi': 'Groq multi-modelo',
+      'openrouter-multi': 'OpenRouter multi-modelo',
+      openai: 'OpenAI'
+    };
+
+    function updateSettingsSummary() {
+      const mode = document.getElementById('router-mode-select').value;
+      const summaryEl = document.getElementById('settings-summary');
+      let text = mode === 'auto' ? '🧠 Auto' : '🎛️ Manual';
+
+      if (mode === 'manual') {
+        const engine = document.getElementById('engine-select').value;
+        let label = ENGINE_SUMMARY_LABELS[engine];
+        if (engine === 'groq') label = 'Groq: ' + document.getElementById('groq-model-select').value.split('/').pop();
+        if (engine === 'openrouter') label = 'OpenRouter: ' + document.getElementById('openrouter-model-select').value.split('/').pop();
+        text += ' · ' + (label || engine);
+      }
+
+      if (useCouncil) text += ' · Council ON';
+      summaryEl.innerText = text;
+    }
+
+    document.getElementById('router-mode-select').addEventListener('change', updateSettingsSummary);
+    document.getElementById('engine-select').addEventListener('change', updateSettingsSummary);
+    document.getElementById('groq-model-select').addEventListener('change', updateSettingsSummary);
+    document.getElementById('openrouter-model-select').addEventListener('change', updateSettingsSummary);
+    // ===== FIN PANEL DE OPCIONES =====
+
     let useCouncil = false;
     document.getElementById('council-toggle-btn').addEventListener('click', () => {
       useCouncil = !useCouncil;
@@ -813,6 +863,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
         text.className = 'text-slate-400';
         syncManualRowVisibility();
       }
+      updateSettingsSummary();
     });
 
     function syncManualRowVisibility() {
@@ -826,6 +877,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
     }
     document.getElementById('router-mode-select').addEventListener('change', syncManualRowVisibility);
     syncManualRowVisibility();
+    updateSettingsSummary();
 
     function selectEngineForPrompt(prompt) {
       const p = prompt.toLowerCase();
@@ -896,7 +948,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
     function appendEngineMessageToDOM(name, content, statusText, statusClass) {
       const container = document.getElementById('messages-container');
       const div = document.createElement('div');
-      div.className = 'p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs space-y-1 my-1 max-w-[90%] self-start w-full shadow-md';
+      div.className = 'p-3 bg-slate-900 border border-slate-800 rounded-2xl text-xs space-y-1 my-1 max-w-[90%] self-start w-full shadow-md';
       div.innerHTML = `
         <div class="flex justify-between items-center border-b border-slate-800 pb-1">
           <span class="font-bold text-teal-400">🤖 ${name}</span>
@@ -1010,7 +1062,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
     function appendMultiModelBlock(providerLabel, models, reasonSuffix) {
       const container = document.getElementById('messages-container');
       const outer = document.createElement('div');
-      outer.className = 'p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs space-y-2 my-1 max-w-[92%] self-start w-full shadow-md';
+      outer.className = 'p-3 bg-slate-900 border border-slate-800 rounded-2xl text-xs space-y-2 my-1 max-w-[92%] self-start w-full shadow-md';
 
       const header = document.createElement('div');
       header.className = 'font-bold text-teal-400 border-b border-slate-800 pb-1';
@@ -1120,12 +1172,23 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       saveState();
     }
 
+    // ===== INPUT MULTILÍNEA CON AUTO-CRECIMIENTO =====
+    const userInputEl = document.getElementById('user-input');
+
+    function autoResizeTextarea() {
+      userInputEl.style.height = 'auto';
+      userInputEl.style.height = Math.min(userInputEl.scrollHeight, 144) + 'px';
+    }
+    userInputEl.addEventListener('input', autoResizeTextarea);
+    // ===== FIN INPUT MULTILÍNEA =====
+
     document.getElementById('launch-btn').onclick = async () => {
       const inputEl = document.getElementById('user-input');
       const prompt = inputEl.value.trim();
       if (!prompt) return;
 
       inputEl.value = '';
+      inputEl.style.height = 'auto';
       document.getElementById('empty-notice').classList.add('hidden');
 
       const chat = currentChat();
@@ -1171,8 +1234,12 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       }
     };
 
-    document.getElementById('user-input').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') document.getElementById('launch-btn').click();
+    userInputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        document.getElementById('launch-btn').click();
+      }
+      // Enter solo (sin Ctrl/Cmd) inserta un salto de línea normal — comportamiento nativo del textarea, no se intercepta.
     });
 
     function speakText(text) {
@@ -1224,6 +1291,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
         const inputEl = document.getElementById('user-input');
         inputEl.value = transcript;
         inputEl.focus();
+        autoResizeTextarea();
       };
 
       micBtn.addEventListener('click', () => {
