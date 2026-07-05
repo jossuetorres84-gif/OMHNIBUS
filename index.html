@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -196,6 +196,30 @@
       return META_KEYWORDS.some(k => p.includes(k));
     }
 
+    const REALTIME_KEYWORDS = [
+      'qué día es', 'que dia es', 'qué fecha es', 'que fecha es', 'fecha actual', 'hoy es',
+      'qué hora es', 'que hora es', 'noticias', 'última hora', 'ultima hora', 'reciente',
+      'recientemente', 'actualidad', 'actualmente', 'en este momento', 'ahora mismo',
+      'quién es el actual', 'quien es el actual', 'quién es actualmente', 'quien es actualmente',
+      'precio de', 'cotización', 'cotizacion', 'tipo de cambio', 'clima', 'pronóstico', 'pronostico',
+      'última versión', 'ultima version', 'último modelo', 'ultimo modelo', 'año actual', 'ano actual'
+    ];
+
+    function isRealtimeQuestion(prompt) {
+      const p = prompt.toLowerCase();
+      return REALTIME_KEYWORDS.some(k => p.includes(k));
+    }
+
+    function getCurrentDateTimeContext() {
+      const now = new Date();
+      const formatted = new Intl.DateTimeFormat('es-EC', {
+        timeZone: 'America/Guayaquil',
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      }).format(now);
+      return `Fecha y hora reales actuales (reloj del dispositivo, zona horaria Ecuador UTC-5): ${formatted}. Esta es la fecha verdadera de "ahora", no la fecha de corte de tu entrenamiento. Tu conocimiento interno puede estar desactualizado en temas como noticias, eventos recientes, cargos públicos actuales, precios, clima o versiones recientes de software. Si la pregunta trata sobre algo que cambia con el tiempo y esta llamada no tiene búsqueda web activa, dilo explícitamente ("mi información puede estar desactualizada, te recomiendo verificarlo") en vez de responder con seguridad usando datos posiblemente obsoletos.`;
+    }
+
     const LIVE_RESEARCH_INSTRUCTION = `Tienes acceso a búsqueda web en tiempo real. Antes de responder, busca información actual y verificable sobre las fortalezas, debilidades, benchmarks y limitaciones conocidas de estos modelos concretos que conforman a ÓMHNIBUS: "Gemini 3.5 Flash" (Google), "Llama 3.3 70B" y "GPT-OSS 120B" (servidos vía Groq), y los modelos gratuitos de OpenRouter como "Llama 3.3 70B Instruct" y "DeepSeek R1". Sintetiza lo que encuentres en una respuesta clara, preséntala como el autodiagnóstico de ÓMHNIBUS (la suma de estos motores trabajando juntos), y cita de dónde sacaste la información cuando sea relevante. No inventes cifras ni benchmarks si no los encuentras — dilo explícitamente en vez de inventar.`;
 
     let selfDataCache = null;
@@ -227,7 +251,7 @@
     let projectData = loadProjectState();
 
     async function buildSystemContext(prompt, engineLabel, engine, model) {
-      let parts = [IDENTITY_PROMPT];
+      let parts = [IDENTITY_PROMPT, getCurrentDateTimeContext()];
 
       const memory = loadMemory();
       if (memory) {
@@ -258,6 +282,10 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
           }
         }
         parts.push(`Dato en tiempo real: el motor que está generando esta respuesta específica es "${engineLabel}".`);
+      }
+
+      if (isRealtimeQuestion(prompt) && engine === 'groq' && model === 'groq/compound') {
+        parts.push(`Esta pregunta requiere información actual y verificable. Usa tu búsqueda web en tiempo real antes de responder, y basa tu respuesta en lo que encuentres, no en tu memoria de entrenamiento.`);
       }
 
       return capSystemPrompt(parts.join('\n\n'));
@@ -892,8 +920,11 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       renderChatList();
       appendUserMessageToDOM(prompt);
 
-      if (isMetaQuestion(prompt) && !useCouncil) {
-        await callEngine('groq', 'groq/compound', 'autodiagnóstico verificado con búsqueda web');
+      if ((isMetaQuestion(prompt) || isRealtimeQuestion(prompt)) && !useCouncil) {
+        const reason = isMetaQuestion(prompt)
+          ? 'autodiagnóstico verificado con búsqueda web'
+          : 'información en tiempo real verificada con búsqueda web';
+        await callEngine('groq', 'groq/compound', reason);
         return;
       }
 
@@ -997,4 +1028,4 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
     updateProgressBar();
   </script>
 </body>
-</html>               
+</html>
