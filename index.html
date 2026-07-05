@@ -12,7 +12,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
     import {
       getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-      onAuthStateChanged, signOut
+      onAuthStateChanged, signOut, sendPasswordResetEmail
     } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
     import {
       getFirestore, doc, getDoc, setDoc
@@ -35,7 +35,7 @@
     window.FB = {
       auth, db,
       createUserWithEmailAndPassword, signInWithEmailAndPassword,
-      onAuthStateChanged, signOut, doc, getDoc, setDoc
+      onAuthStateChanged, signOut, doc, getDoc, setDoc, sendPasswordResetEmail
     };
 
     window.dispatchEvent(new Event('fb-ready'));
@@ -51,6 +51,7 @@
         <button id="auth-login-btn" class="flex-1 bg-teal-600 hover:bg-teal-500 text-white py-2 rounded-lg text-xs font-semibold">Iniciar sesión</button>
         <button id="auth-register-btn" class="flex-1 bg-slate-800 hover:bg-slate-700 text-teal-300 py-2 rounded-lg text-xs font-semibold">Crear cuenta</button>
       </div>
+      <button id="auth-reset-btn" class="text-[11px] text-teal-400 underline block mx-auto">¿Olvidaste tu contraseña?</button>
       <div id="auth-status" class="text-[11px] text-center font-mono text-slate-500 min-h-[14px]"></div>
     </div>
   </div>
@@ -502,6 +503,22 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
         statusEl.innerText = 'Creando cuenta...';
         try {
           await window.FB.createUserWithEmailAndPassword(window.FB.auth, email, password);
+        } catch (err) {
+          statusEl.innerText = traducirErrorFirebase(err.code);
+        }
+      });
+
+      document.getElementById('auth-reset-btn').addEventListener('click', async () => {
+        const email = document.getElementById('auth-email').value.trim();
+        const statusEl = document.getElementById('auth-status');
+        if (!email) {
+          statusEl.innerText = 'Escribe tu correo arriba primero.';
+          return;
+        }
+        statusEl.innerText = 'Enviando correo de recuperación...';
+        try {
+          await window.FB.sendPasswordResetEmail(window.FB.auth, email);
+          statusEl.innerText = '🟢 Correo enviado. Revisa tu bandeja de entrada (y spam).';
         } catch (err) {
           statusEl.innerText = traducirErrorFirebase(err.code);
         }
