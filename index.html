@@ -7,7 +7,55 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-[#0b0f19] text-slate-100 font-sans antialiased">
-  <div class="flex flex-col h-screen max-w-2xl mx-auto p-4 justify-between">
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+    import {
+      getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+      onAuthStateChanged, signOut
+    } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+    import {
+      getFirestore, doc, getDoc, setDoc
+    } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyATx52kvm_LYzl08iY_IQ6a-3a9S712DdM",
+      authDomain: "omhnibus.firebaseapp.com",
+      projectId: "omhnibus",
+      storageBucket: "omhnibus.firebasestorage.app",
+      messagingSenderId: "244724684007",
+      appId: "1:244724684007:web:3493e97fe136510130fe42",
+      measurementId: "G-01DHDC9360"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    window.FB = {
+      auth, db,
+      createUserWithEmailAndPassword, signInWithEmailAndPassword,
+      onAuthStateChanged, signOut, doc, getDoc, setDoc
+    };
+
+    window.dispatchEvent(new Event('fb-ready'));
+  </script>
+
+  <div id="auth-screen" class="flex flex-col h-screen max-w-sm mx-auto p-4 justify-center items-center gap-4">
+    <h1 class="text-2xl font-bold tracking-widest text-teal-400">ÓMHNIBUS</h1>
+    <p class="text-xs text-slate-400 text-center">Inicia sesión para sincronizar tus chats entre dispositivos</p>
+    <div class="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+      <input type="email" id="auth-email" placeholder="Correo electrónico" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-teal-500">
+      <input type="password" id="auth-password" placeholder="Contraseña (mínimo 6 caracteres)" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-teal-500">
+      <div class="flex gap-2">
+        <button id="auth-login-btn" class="flex-1 bg-teal-600 hover:bg-teal-500 text-white py-2 rounded-lg text-xs font-semibold">Iniciar sesión</button>
+        <button id="auth-register-btn" class="flex-1 bg-slate-800 hover:bg-slate-700 text-teal-300 py-2 rounded-lg text-xs font-semibold">Crear cuenta</button>
+      </div>
+      <div id="auth-status" class="text-[11px] text-center font-mono text-slate-500 min-h-[14px]"></div>
+    </div>
+  </div>
+
+  <div id="app-screen" class="hidden flex flex-col h-screen max-w-2xl mx-auto p-4 justify-between">
 
     <header class="flex flex-col gap-2 py-2 border-b border-slate-800">
       <div class="flex justify-between items-center">
@@ -109,6 +157,12 @@
         <textarea id="memory-textarea" rows="4" placeholder="Escribe aquí las instrucciones de comportamiento o datos fijos que desees que el sistema recuerde para todos tus chats..." class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-teal-500"></textarea>
         <button onclick="saveMemory()" class="w-full bg-teal-600 hover:bg-teal-500 text-white py-2 rounded-lg text-xs font-semibold">Guardar memoria</button>
         <div id="memory-status" class="text-[10px] text-center font-mono text-slate-500"></div>
+      </div>
+
+      <div class="space-y-2 border-t border-slate-800 pt-4">
+        <h3 class="text-sm font-semibold text-center text-teal-400">Cuenta</h3>
+        <div id="account-email" class="text-[11px] text-center text-slate-400 font-mono"></div>
+        <button onclick="handleLogout()" class="w-full bg-red-950/50 border border-red-800/60 hover:bg-red-900/50 text-red-300 py-2 rounded-lg text-xs font-semibold">Cerrar sesión</button>
       </div>
     </div>
 
@@ -246,6 +300,7 @@
     function saveProjectState() {
       localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projectData));
       updateProgressBar();
+      queueCloudSync();
     }
 
     let projectData = loadProjectState();
@@ -313,6 +368,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
 
     function saveState() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      queueCloudSync();
     }
 
     let state = loadState();
@@ -327,7 +383,149 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       const statusEl = document.getElementById('memory-status');
       statusEl.innerText = '🟢 Memoria guardada — se aplicará en tu próximo mensaje.';
       setTimeout(() => { statusEl.innerText = ''; }, 3000);
+      queueCloudSync();
     }
+
+    // ===== FIREBASE: AUTENTICACIÓN Y SINCRONIZACIÓN =====
+    let currentUser = null;
+    let cloudSyncTimeout = null;
+
+    function queueCloudSync() {
+      if (!currentUser) return;
+      clearTimeout(cloudSyncTimeout);
+      cloudSyncTimeout = setTimeout(pushStateToCloud, 800);
+    }
+
+    async function pushStateToCloud() {
+      if (!currentUser || !window.FB) return;
+      try {
+        const ref = window.FB.doc(window.FB.db, 'users', currentUser.uid);
+        await window.FB.setDoc(ref, {
+          state,
+          memory: loadMemory(),
+          projectData,
+          updatedAt: Date.now()
+        }, { merge: true });
+      } catch (err) {
+        console.error('Error al sincronizar con Firestore:', err);
+      }
+    }
+
+    async function pullStateFromCloud() {
+      if (!currentUser || !window.FB) return;
+      try {
+        const ref = window.FB.doc(window.FB.db, 'users', currentUser.uid);
+        const snap = await window.FB.getDoc(ref);
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.state) {
+            state = data.state;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+          }
+          if (typeof data.memory === 'string') {
+            localStorage.setItem(MEMORY_KEY, data.memory);
+          }
+          if (data.projectData) {
+            projectData = data.projectData;
+            localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projectData));
+          }
+        } else {
+          await pushStateToCloud();
+        }
+      } catch (err) {
+        console.error('Error al leer de Firestore:', err);
+      }
+    }
+
+    function showApp() {
+      document.getElementById('auth-screen').classList.add('hidden');
+      document.getElementById('app-screen').classList.remove('hidden');
+      document.getElementById('app-screen').classList.add('flex');
+    }
+
+    function showAuth() {
+      document.getElementById('app-screen').classList.add('hidden');
+      document.getElementById('app-screen').classList.remove('flex');
+      document.getElementById('auth-screen').classList.remove('hidden');
+    }
+
+    function initAppAfterLogin() {
+      document.getElementById('account-email').innerText = currentUser.email;
+      document.getElementById('memory-textarea').value = loadMemory();
+      renderChatList();
+      renderMessages();
+      updateProgressBar();
+      showApp();
+    }
+
+    window.addEventListener('fb-ready', () => {
+      window.FB.onAuthStateChanged(window.FB.auth, async (user) => {
+        if (user) {
+          currentUser = user;
+          document.getElementById('auth-status').innerText = 'Sincronizando...';
+          await pullStateFromCloud();
+          initAppAfterLogin();
+        } else {
+          currentUser = null;
+          showAuth();
+        }
+      });
+
+      document.getElementById('auth-login-btn').addEventListener('click', async () => {
+        const email = document.getElementById('auth-email').value.trim();
+        const password = document.getElementById('auth-password').value;
+        const statusEl = document.getElementById('auth-status');
+        if (!email || !password) {
+          statusEl.innerText = 'Completa correo y contraseña.';
+          return;
+        }
+        statusEl.innerText = 'Iniciando sesión...';
+        try {
+          await window.FB.signInWithEmailAndPassword(window.FB.auth, email, password);
+        } catch (err) {
+          statusEl.innerText = traducirErrorFirebase(err.code);
+        }
+      });
+
+      document.getElementById('auth-register-btn').addEventListener('click', async () => {
+        const email = document.getElementById('auth-email').value.trim();
+        const password = document.getElementById('auth-password').value;
+        const statusEl = document.getElementById('auth-status');
+        if (!email || !password) {
+          statusEl.innerText = 'Completa correo y contraseña.';
+          return;
+        }
+        if (password.length < 6) {
+          statusEl.innerText = 'La contraseña debe tener al menos 6 caracteres.';
+          return;
+        }
+        statusEl.innerText = 'Creando cuenta...';
+        try {
+          await window.FB.createUserWithEmailAndPassword(window.FB.auth, email, password);
+        } catch (err) {
+          statusEl.innerText = traducirErrorFirebase(err.code);
+        }
+      });
+    });
+
+    function traducirErrorFirebase(code) {
+      const map = {
+        'auth/email-already-in-use': 'Ese correo ya tiene una cuenta. Intenta iniciar sesión.',
+        'auth/invalid-email': 'Correo electrónico inválido.',
+        'auth/weak-password': 'La contraseña es muy débil (mínimo 6 caracteres).',
+        'auth/user-not-found': 'No existe una cuenta con ese correo.',
+        'auth/wrong-password': 'Contraseña incorrecta.',
+        'auth/invalid-credential': 'Correo o contraseña incorrectos.',
+        'auth/too-many-requests': 'Demasiados intentos. Espera un momento e intenta de nuevo.'
+      };
+      return map[code] || ('Error: ' + code);
+    }
+
+    function handleLogout() {
+      if (!confirm('¿Cerrar sesión?')) return;
+      window.FB.signOut(window.FB.auth);
+    }
+    // ===== FIN BLOQUE FIREBASE =====
 
     function currentChat() {
       return state.chats[state.currentChatId];
@@ -1023,9 +1221,6 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
         alert('Este navegador no soporta dictado por voz. Prueba desde Chrome.');
       });
     }
-
-    renderMessages();
-    updateProgressBar();
   </script>
 </body>
 </html>
