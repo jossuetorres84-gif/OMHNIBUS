@@ -5,6 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ÓMHNIBUS Core Engine</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    mark.search-hl {
+      background-color: rgba(245, 158, 11, 0.45);
+      color: #ffffff;
+      border-radius: 2px;
+      padding: 0 1px;
+    }
+    mark.search-hl.current-match {
+      background-color: #f59e0b;
+      color: #0b0f19;
+      outline: 2px solid #ffffff;
+    }
+    .council-row {
+      scrollbar-width: thin;
+    }
+    .council-row::-webkit-scrollbar {
+      height: 4px;
+    }
+    .council-row::-webkit-scrollbar-thumb {
+      background-color: #334155;
+      border-radius: 4px;
+    }
+  </style>
 </head>
 <body class="bg-[#0b0f19] text-slate-100 font-sans antialiased">
 
@@ -58,7 +81,7 @@
 
   <div id="app-screen" class="hidden flex flex-col h-screen max-w-2xl mx-auto p-4 justify-between">
 
-    <header class="flex flex-col gap-2 py-2 border-b border-slate-800">
+    <header class="sticky top-0 z-20 bg-[#0b0f19] flex flex-col gap-2 py-2 border-b border-slate-800">
       <div class="flex justify-between items-center">
         <div class="flex items-center gap-2">
           <button onclick="toggleChatList()" class="text-lg px-1 text-slate-300">☰</button>
@@ -198,14 +221,15 @@
       </div>
     </div>
 
-    <main id="chat-screen" class="flex-1 overflow-y-auto my-4 space-y-4 pr-1 text-sm scroll-smooth">
+    <main id="chat-screen" class="flex-1 overflow-y-auto overflow-x-hidden my-4 space-y-4 pr-1 text-sm scroll-smooth">
       <div id="empty-notice" class="text-center text-slate-600 mt-20 text-xs px-4">Ecosistema listo. Lanza una instrucción.</div>
       <div id="messages-container" class="space-y-4 flex flex-col"></div>
     </main>
 
-    <button id="scroll-bottom-btn" onclick="scrollChatToBottom()" class="hidden fixed bottom-36 left-1/2 -translate-x-1/2 z-30 bg-slate-800 border border-slate-700 text-teal-300 rounded-full w-9 h-9 items-center justify-center shadow-lg text-sm">⬇</button>
+    <button id="scroll-up-question-btn" onclick="scrollToPreviousQuestion()" class="hidden fixed bottom-48 left-1/2 -translate-x-1/2 z-30 bg-slate-800 border border-slate-700 text-teal-300 rounded-full w-9 h-9 items-center justify-center shadow-lg text-sm">⬆</button>
+    <button id="scroll-bottom-btn" onclick="handleFloatingScrollBtn()" class="hidden fixed bottom-36 left-1/2 -translate-x-1/2 z-30 bg-slate-800 border border-slate-700 text-teal-300 rounded-full w-9 h-9 items-center justify-center shadow-lg text-sm">⬇</button>
 
-    <footer id="controls-footer" class="space-y-2">
+    <footer id="controls-footer" class="sticky bottom-0 z-20 bg-[#0b0f19] pt-1 space-y-2">
 
       <div id="settings-bar" class="flex items-center justify-between gap-2 bg-slate-950/60 border border-slate-800/60 rounded-xl px-3 py-2 text-[11px] cursor-pointer" onclick="toggleSettingsPanel()">
         <span id="settings-summary" class="text-teal-300 font-mono truncate">🧠 Auto</span>
@@ -220,7 +244,7 @@
         <div class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
           <span class="text-slate-400 pl-1 font-mono">Modo:</span>
           <select id="router-mode-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
-            <option value="auto">🧠 Auto (Router Inteligente)</option>
+            <option value="auto">🧠 Auto (siempre prioriza búsqueda web)</option>
             <option value="manual">🎛️ Manual</option>
           </select>
         </div>
@@ -889,6 +913,9 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
     // ===== FIN PANEL DE OPCIONES =====
 
     let useCouncil = false;
+    let lastCouncilRow = null;
+    let questionScrollIndex = null;
+
     document.getElementById('council-toggle-btn').addEventListener('click', () => {
       useCouncil = !useCouncil;
       const indicator = document.getElementById('council-indicator');
@@ -896,7 +923,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       const manualRow = document.getElementById('manual-engine-row');
       if (useCouncil) {
         indicator.className = "w-2 h-2 rounded-full bg-amber-400 animate-pulse";
-        text.innerText = 'ÓMHNIBUS COUNCIL: MODO SECUENCIAL ACTIVO';
+        text.innerText = 'ÓMHNIBUS COUNCIL: MODO LATERAL ACTIVO (desliza →)';
         text.className = 'text-amber-400 font-semibold';
         manualRow.classList.add('hidden');
       } else {
@@ -958,12 +985,36 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       return (EXPERTS[engine] && EXPERTS[engine][category]) || EXPERTS[engine].general;
     }
 
+    // ===== CONTROLES DE VOZ (VELOCIDAD POR BURBUJA) =====
+    const RATE_OPTIONS = [0.25, 0.5, 0.75, 1, 1.5, 2, 2.5, 3, 3.5, 4];
+
+    function buildSpeechControlsHTML() {
+      const opts = RATE_OPTIONS.map(r => `<option value="${r}" ${r === 1 ? 'selected' : ''}>${r}x</option>`).join('');
+      return `<select class="rate-select bg-slate-950 border border-slate-800 text-teal-300 text-[9px] rounded px-1 py-0.5 focus:outline-none" onclick="event.stopPropagation()">${opts}</select><button class="speak-btn text-teal-300 text-xs shrink-0">🔊</button>`;
+    }
+
+    function speakText(text, rate) {
+      if (!('speechSynthesis' in window)) {
+        alert('Este navegador no soporta síntesis de voz.');
+        return;
+      }
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'es-419';
+      utterance.rate = (rate && !isNaN(rate)) ? rate : 1;
+      window.speechSynthesis.speak(utterance);
+    }
+    // ===== FIN CONTROLES DE VOZ =====
+
     function renderMessages() {
       const container = document.getElementById('messages-container');
       container.innerHTML = '';
       const chat = currentChat();
       const emptyNotice = document.getElementById('empty-notice');
       const turns = chat ? getActiveTurns(chat) : [];
+
+      lastCouncilRow = null;
+      questionScrollIndex = null;
 
       if (!chat || turns.length === 0) {
         emptyNotice.classList.remove('hidden');
@@ -975,6 +1026,8 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
         for (const turn of turns) {
           if (turn.role === 'user') {
             appendUserMessageToDOM(turn.content);
+          } else if (turn.council) {
+            renderCouncilTurn(turn.cards);
           } else {
             appendEngineMessageToDOM(turn.engineLabel || turn.engine || 'IA', turn.content, turn.statusText, turn.statusClass);
           }
@@ -983,6 +1036,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       const screen = document.getElementById('chat-screen');
       screen.scrollTop = screen.scrollHeight;
       updateScrollButtonVisibility();
+      updateQuestionButtonVisibility();
     }
 
     function appendUserMessageToDOM(text) {
@@ -990,6 +1044,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       const msgDiv = document.createElement('div');
       msgDiv.className = 'p-3 rounded-2xl max-w-[85%] bg-teal-600 text-white ml-auto whitespace-pre-wrap text-sm shadow-md my-1 self-end';
       msgDiv.setAttribute('data-searchable', 'true');
+      msgDiv.setAttribute('data-role', 'user');
       msgDiv.innerText = text;
       container.appendChild(msgDiv);
       const screen = document.getElementById('chat-screen');
@@ -1003,34 +1058,35 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       div.className = 'p-3 bg-slate-900 border border-slate-800 rounded-2xl text-xs space-y-1 my-1 max-w-[90%] self-start w-full shadow-md';
       div.setAttribute('data-searchable', 'true');
       div.innerHTML = `
-        <div class="flex justify-between items-center border-b border-slate-800 pb-1">
-          <span class="font-bold text-teal-400">🤖 ${name}</span>
-          <div class="flex items-center gap-2">
-            <button class="speak-btn text-teal-300 text-xs">🔊</button>
-            <span class="text-[9px] font-mono tracking-wider ${statusClass || 'text-amber-400 animate-pulse'}">${statusText || 'CONECTANDO...'}</span>
+        <div class="flex justify-between items-center border-b border-slate-800 pb-1 gap-1">
+          <span class="font-bold text-teal-400 truncate pr-1">🤖 ${name}</span>
+          <div class="flex items-center gap-1 shrink-0">
+            ${buildSpeechControlsHTML()}
+            <span class="status-badge text-[9px] font-mono tracking-wider whitespace-nowrap ${statusClass || 'text-amber-400 animate-pulse'}">${statusText || 'CONECTANDO...'}</span>
           </div>
         </div>
-        <div class="mt-1 text-slate-300 whitespace-pre-wrap leading-relaxed">${content}</div>`;
+        <div class="msg-content mt-1 text-slate-300 whitespace-pre-wrap leading-relaxed">${content}</div>`;
       container.appendChild(div);
-      const contentEl = div.children[1];
-      div.querySelector('.speak-btn').onclick = () => speakText(contentEl.innerText);
+      const contentEl = div.querySelector('.msg-content');
+      const statusEl = div.querySelector('.status-badge');
+      div.querySelector('.speak-btn').onclick = () => speakText(contentEl.innerText, parseFloat(div.querySelector('.rate-select').value));
       const screen = document.getElementById('chat-screen');
       screen.scrollTop = screen.scrollHeight;
       updateScrollButtonVisibility();
-      return { content: contentEl, status: div.children[0].children[1].children[1] };
+      return { content: contentEl, status: statusEl };
     }
 
     function markOnline(ui) {
       ui.status.innerText = "🟢 NODO ONLINE";
-      ui.status.className = "text-[9px] text-green-400 font-mono";
+      ui.status.className = "status-badge text-[9px] text-green-400 font-mono whitespace-nowrap";
     }
     function markWarning(ui) {
       ui.status.innerText = "🔴 ADVERTENCIA";
-      ui.status.className = "text-[9px] text-amber-400 font-mono";
+      ui.status.className = "status-badge text-[9px] text-amber-400 font-mono whitespace-nowrap";
     }
     function markError(ui) {
       ui.status.innerText = "🔴 ERROR";
-      ui.status.className = "text-[9px] text-red-500 font-mono";
+      ui.status.className = "status-badge text-[9px] text-red-500 font-mono whitespace-nowrap";
     }
 
     const MAX_CONTEXT_TURNS = 20;
@@ -1043,6 +1099,10 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       const recent = turnsSource.slice(-MAX_CONTEXT_TURNS);
 
       const mapped = recent.map(t => {
+        if (t.council) {
+          const summary = (t.cards || []).map(c => `[${c.title}]: ${(c.text || '').slice(0, 400)}`).join('\n');
+          return { role: 'assistant', content: summary || '(sin respuesta)' };
+        }
         let content = t.engineLabel ? `[${t.engineLabel}] ${t.content}` : t.content;
         if (content.length > MAX_TURN_CHARS) {
           content = content.slice(0, MAX_TURN_CHARS) + '\n[...recortado por longitud para no saturar la petición...]';
@@ -1131,18 +1191,18 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
         const sub = document.createElement('div');
         sub.className = 'border-l-2 border-slate-700 pl-2 space-y-0.5';
         sub.innerHTML = `
-          <div class="flex justify-between items-center">
-            <span class="text-teal-300 font-semibold">${m.split('/').pop()}</span>
-            <div class="flex items-center gap-2">
-              <button class="speak-btn text-teal-300 text-xs">🔊</button>
-              <span class="text-[9px] text-amber-400 animate-pulse font-mono">CONECTANDO...</span>
+          <div class="flex justify-between items-center gap-1">
+            <span class="text-teal-300 font-semibold truncate pr-1">${m.split('/').pop()}</span>
+            <div class="flex items-center gap-1 shrink-0">
+              ${buildSpeechControlsHTML()}
+              <span class="status-badge text-[9px] text-amber-400 animate-pulse font-mono whitespace-nowrap">CONECTANDO...</span>
             </div>
           </div>
-          <div class="text-slate-300 whitespace-pre-wrap leading-relaxed">Procesando...</div>`;
+          <div class="msg-content text-slate-300 whitespace-pre-wrap leading-relaxed">Procesando...</div>`;
         outer.appendChild(sub);
-        const contentEl = sub.children[1];
-        const statusEl = sub.children[0].children[1].children[1];
-        sub.querySelector('.speak-btn').onclick = () => speakText(contentEl.innerText);
+        const contentEl = sub.querySelector('.msg-content');
+        const statusEl = sub.querySelector('.status-badge');
+        sub.querySelector('.speak-btn').onclick = () => speakText(contentEl.innerText, parseFloat(sub.querySelector('.rate-select').value));
         subBlocks[m] = { status: statusEl, content: contentEl };
       }
 
@@ -1168,7 +1228,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
         const ui = subBlocks[m];
         ui.content.innerText = result.text;
         ui.status.innerText = result.ok ? '🟢 OK' : '🔴 ERROR';
-        ui.status.className = `text-[9px] font-mono ${result.ok ? 'text-green-400' : 'text-red-500'}`;
+        ui.status.className = `status-badge text-[9px] font-mono whitespace-nowrap ${result.ok ? 'text-green-400' : 'text-red-500'}`;
         resultsForHistory.push({ model: m, ok: result.ok, text: result.text });
       }));
 
@@ -1281,17 +1341,149 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
     }
     // ===== FIN CADENA DE RESPALDO =====
 
-    // ===== SCROLL AL FINAL Y BÚSQUEDA EN EL CHAT =====
-    function updateScrollButtonVisibility() {
-      const screen = document.getElementById('chat-screen');
-      const btn = document.getElementById('scroll-bottom-btn');
-      const distanceFromBottom = screen.scrollHeight - screen.scrollTop - screen.clientHeight;
-      if (distanceFromBottom > 120) {
-        btn.classList.remove('hidden');
-        btn.classList.add('flex');
+    // ===== MODO AUTO: SIEMPRE INICIA CON BÚSQUEDA WEB (salvo offline) =====
+    async function handleAutoMode(prompt) {
+      const choice = selectEngineForPrompt(prompt);
+      const online = navigator.onLine;
+      const attempts = [];
+
+      if (online) {
+        attempts.push({ engine: 'groq', model: 'groq/compound', lite: true });
+      }
+
+      if (choice.engine === 'groq') {
+        attempts.push({ engine: 'groq', model: 'openai/gpt-oss-120b' });
+      } else if (choice.engine === 'openrouter') {
+        attempts.push({ engine: 'openrouter', model: 'openrouter/free' });
       } else {
-        btn.classList.add('hidden');
-        btn.classList.remove('flex');
+        attempts.push({ engine: choice.engine, model: null });
+      }
+
+      attempts.push({ engine: 'gemini', model: null });
+      attempts.push({ engine: 'groq', model: 'openai/gpt-oss-120b' });
+      attempts.push({ engine: 'openrouter', model: 'openrouter/free' });
+
+      const seen = new Set();
+      const dedupedChain = attempts.filter(item => {
+        const key = item.engine + '|' + (item.model || '');
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      let reasonBase;
+      if (isMetaQuestion(prompt)) reasonBase = 'autodiagnóstico verificado con búsqueda web';
+      else if (isRealtimeQuestion(prompt)) reasonBase = 'información en tiempo real verificada con búsqueda web';
+      else reasonBase = choice.reason;
+
+      const reason = online
+        ? `búsqueda web primero — ${reasonBase}`
+        : `sin conexión detectada — ${reasonBase} (posibles datos desactualizados)`;
+
+      await callEngineWithFallback(dedupedChain, reason);
+    }
+    // ===== FIN MODO AUTO =====
+
+    // ===== COUNCIL: LAYOUT LATERAL (SWIPE) =====
+    function createCouncilCard(title) {
+      const card = document.createElement('div');
+      card.className = 'council-card snap-center shrink-0 w-[80%] sm:max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-3 text-xs space-y-1 shadow-md';
+      card.innerHTML = `
+        <div class="flex justify-between items-center border-b border-slate-800 pb-1 gap-1">
+          <span class="font-bold text-teal-400 truncate pr-1">🤖 ${title}</span>
+          <div class="flex items-center gap-1 shrink-0">
+            ${buildSpeechControlsHTML()}
+            <span class="status-badge text-[9px] font-mono tracking-wider text-amber-400 animate-pulse whitespace-nowrap">CONECTANDO...</span>
+          </div>
+        </div>
+        <div class="msg-content mt-1 text-slate-300 whitespace-pre-wrap leading-relaxed">Procesando...</div>`;
+      const contentEl = card.querySelector('.msg-content');
+      const statusEl = card.querySelector('.status-badge');
+      card.querySelector('.speak-btn').onclick = () => speakText(contentEl.innerText, parseFloat(card.querySelector('.rate-select').value));
+      return { card, content: contentEl, status: statusEl };
+    }
+
+    function appendCouncilRowToDOM(titles) {
+      const container = document.getElementById('messages-container');
+      const wrapper = document.createElement('div');
+      wrapper.className = 'council-row-wrapper w-full my-1';
+      wrapper.setAttribute('data-searchable', 'true');
+
+      const row = document.createElement('div');
+      row.className = 'council-row flex gap-2 overflow-x-auto snap-x snap-mandatory pb-1 -mx-1 px-1';
+      wrapper.appendChild(row);
+
+      const cardRefs = titles.map(t => {
+        const ref = createCouncilCard(t);
+        row.appendChild(ref.card);
+        return ref;
+      });
+
+      container.appendChild(wrapper);
+      lastCouncilRow = row;
+      row.addEventListener('scroll', updateScrollButtonVisibility);
+
+      const screen = document.getElementById('chat-screen');
+      screen.scrollTop = screen.scrollHeight;
+      updateScrollButtonVisibility();
+
+      return { wrapper, row, cardRefs };
+    }
+
+    function renderCouncilTurn(cardsData) {
+      const { cardRefs } = appendCouncilRowToDOM((cardsData || []).map(c => c.title));
+      (cardsData || []).forEach((c, i) => {
+        cardRefs[i].content.innerText = c.text;
+        cardRefs[i].status.innerText = c.ok ? '🟢 OK' : '🔴 ERROR';
+        cardRefs[i].status.className = `status-badge text-[9px] font-mono whitespace-nowrap ${c.ok ? 'text-green-400' : 'text-red-500'}`;
+      });
+    }
+
+    async function runCouncilRound(prompt) {
+      const { category } = selectEngineForPrompt(prompt);
+      const groqModels = expertsFor('groq', category).filter(m => m !== 'groq/compound');
+      const orModels = expertsFor('openrouter', category);
+      const online = navigator.onLine;
+
+      const calls = [];
+      calls.push({ title: 'Gemini 3.5 Flash', engine: 'gemini', model: null });
+      if (online) calls.push({ title: 'Búsqueda Web (Groq Compound)', engine: 'groq', model: 'groq/compound' });
+      groqModels.forEach(m => calls.push({ title: 'Groq: ' + m.split('/').pop(), engine: 'groq', model: m }));
+      orModels.forEach(m => calls.push({ title: 'OpenRouter: ' + m.split('/').pop(), engine: 'openrouter', model: m }));
+
+      const messages = buildMessagesForRequest();
+      const { cardRefs } = appendCouncilRowToDOM(calls.map(c => c.title));
+      const resultsForHistory = new Array(calls.length);
+
+      await Promise.all(calls.map(async (c, i) => {
+        const system = await buildSystemContext(prompt, c.title, c.engine, c.model);
+        const body = { messages, system };
+        if (c.model) body.model = c.model;
+        const result = await callProvider(`/api/${c.engine}`, cardRefs[i], body);
+        resultsForHistory[i] = { title: c.title, ok: result.ok, text: result.text };
+      }));
+
+      const chat = currentChat();
+      const turns = getActiveTurns(chat);
+      turns.push({ role: 'assistant', council: true, cards: resultsForHistory });
+      saveState();
+    }
+    // ===== FIN COUNCIL LATERAL =====
+
+    // ===== SCROLL (VERTICAL / LATERAL) Y NAVEGACIÓN ENTRE PREGUNTAS =====
+    function updateScrollButtonVisibility() {
+      const btn = document.getElementById('scroll-bottom-btn');
+      if (useCouncil && lastCouncilRow) {
+        btn.innerText = '▶';
+        const remaining = lastCouncilRow.scrollWidth - lastCouncilRow.scrollLeft - lastCouncilRow.clientWidth;
+        if (remaining > 20) { btn.classList.remove('hidden'); btn.classList.add('flex'); }
+        else { btn.classList.add('hidden'); btn.classList.remove('flex'); }
+      } else {
+        btn.innerText = '⬇';
+        const screen = document.getElementById('chat-screen');
+        const distanceFromBottom = screen.scrollHeight - screen.scrollTop - screen.clientHeight;
+        if (distanceFromBottom > 120) { btn.classList.remove('hidden'); btn.classList.add('flex'); }
+        else { btn.classList.add('hidden'); btn.classList.remove('flex'); }
       }
     }
 
@@ -1301,8 +1493,44 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       setTimeout(updateScrollButtonVisibility, 300);
     }
 
-    document.getElementById('chat-screen').addEventListener('scroll', updateScrollButtonVisibility);
+    function handleFloatingScrollBtn() {
+      if (useCouncil && lastCouncilRow) {
+        lastCouncilRow.scrollBy({ left: lastCouncilRow.clientWidth * 0.9, behavior: 'smooth' });
+        setTimeout(updateScrollButtonVisibility, 350);
+      } else {
+        scrollChatToBottom();
+      }
+    }
 
+    function scrollToPreviousQuestion() {
+      const userEls = Array.from(document.querySelectorAll('#messages-container [data-role="user"]'));
+      if (userEls.length === 0) return;
+      const screen = document.getElementById('chat-screen');
+
+      if (questionScrollIndex === null) {
+        let idx = 0;
+        for (let i = userEls.length - 1; i >= 0; i--) {
+          if (userEls[i].offsetTop <= screen.scrollTop + 5) { idx = i; break; }
+        }
+        questionScrollIndex = idx;
+      } else if (questionScrollIndex > 0) {
+        questionScrollIndex -= 1;
+      }
+
+      userEls[questionScrollIndex].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function updateQuestionButtonVisibility() {
+      const btn = document.getElementById('scroll-up-question-btn');
+      const hasUser = document.querySelectorAll('#messages-container [data-role="user"]').length > 0;
+      if (hasUser) { btn.classList.remove('hidden'); btn.classList.add('flex'); }
+      else { btn.classList.add('hidden'); btn.classList.remove('flex'); }
+    }
+
+    document.getElementById('chat-screen').addEventListener('scroll', updateScrollButtonVisibility);
+    // ===== FIN SCROLL Y NAVEGACIÓN =====
+
+    // ===== BÚSQUEDA CON RESALTADO REAL DE TEXTO =====
     let searchMatches = [];
     let searchIndex = -1;
 
@@ -1322,20 +1550,67 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       }
     }
 
+    function clearSearchHighlights() {
+      document.querySelectorAll('#messages-container mark.search-hl').forEach(mark => {
+        const parent = mark.parentNode;
+        if (!parent) return;
+        parent.replaceChild(document.createTextNode(mark.textContent), mark);
+        parent.normalize();
+      });
+    }
+
+    function highlightMatches(query) {
+      const matches = [];
+      const q = query.toLowerCase();
+      const roots = document.querySelectorAll('#messages-container [data-searchable]');
+
+      roots.forEach(root => {
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+          acceptNode(node) {
+            if (!node.textContent || !node.textContent.trim()) return NodeFilter.FILTER_REJECT;
+            if (node.parentElement && node.parentElement.closest('select, button')) return NodeFilter.FILTER_REJECT;
+            return NodeFilter.FILTER_ACCEPT;
+          }
+        });
+
+        const textNodes = [];
+        let n;
+        while ((n = walker.nextNode())) textNodes.push(n);
+
+        textNodes.forEach(node => {
+          const text = node.textContent;
+          const lower = text.toLowerCase();
+          if (!lower.includes(q)) return;
+
+          const frag = document.createDocumentFragment();
+          let lastIndex = 0;
+          let idx = lower.indexOf(q);
+          while (idx !== -1) {
+            if (idx > lastIndex) frag.appendChild(document.createTextNode(text.slice(lastIndex, idx)));
+            const mark = document.createElement('mark');
+            mark.className = 'search-hl';
+            mark.textContent = text.slice(idx, idx + query.length);
+            frag.appendChild(mark);
+            matches.push(mark);
+            lastIndex = idx + query.length;
+            idx = lower.indexOf(q, lastIndex);
+          }
+          if (lastIndex < text.length) frag.appendChild(document.createTextNode(text.slice(lastIndex)));
+          node.parentNode.replaceChild(frag, node);
+        });
+      });
+
+      return matches;
+    }
+
     function performChatSearch() {
-      const query = document.getElementById('chat-search-input').value.trim().toLowerCase();
+      const query = document.getElementById('chat-search-input').value.trim();
       clearSearchHighlights();
       searchMatches = [];
       searchIndex = -1;
       if (!query) { updateSearchCounter(); return; }
 
-      const bubbles = document.querySelectorAll('#messages-container [data-searchable]');
-      bubbles.forEach(el => {
-        if (el.textContent.toLowerCase().includes(query)) {
-          searchMatches.push(el);
-        }
-      });
-
+      searchMatches = highlightMatches(query);
       updateSearchCounter();
       if (searchMatches.length > 0) {
         searchIndex = 0;
@@ -1344,18 +1619,12 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
     }
 
     function goToSearchMatch() {
-      clearSearchHighlights();
+      document.querySelectorAll('#messages-container mark.search-hl').forEach(m => m.classList.remove('current-match'));
       if (searchMatches.length === 0) return;
-      const el = searchMatches[searchIndex];
-      el.classList.add('ring-2', 'ring-amber-400');
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const mark = searchMatches[searchIndex];
+      mark.classList.add('current-match');
+      mark.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
       updateSearchCounter();
-    }
-
-    function clearSearchHighlights() {
-      document.querySelectorAll('#messages-container .ring-2').forEach(el => {
-        el.classList.remove('ring-2', 'ring-amber-400');
-      });
     }
 
     function updateSearchCounter() {
@@ -1374,7 +1643,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       searchIndex = (searchIndex - 1 + searchMatches.length) % searchMatches.length;
       goToSearchMatch();
     }
-    // ===== FIN SCROLL Y BÚSQUEDA =====
+    // ===== FIN BÚSQUEDA =====
 
     // ===== INPUT MULTILÍNEA CON AUTO-CRECIMIENTO =====
     const userInputEl = document.getElementById('user-input');
@@ -1408,49 +1677,17 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       saveState();
       renderChatList();
       appendUserMessageToDOM(prompt);
-
-      if ((isMetaQuestion(prompt) || isRealtimeQuestion(prompt)) && !useCouncil) {
-        const reason = isMetaQuestion(prompt)
-          ? 'autodiagnóstico verificado con búsqueda web'
-          : 'información en tiempo real verificada con búsqueda web';
-        await callEngineWithFallback([
-          { engine: 'groq', model: 'groq/compound', lite: true },
-          { engine: 'gemini', model: null },
-          { engine: 'groq', model: 'openai/gpt-oss-120b' },
-          { engine: 'openrouter', model: 'openrouter/free' }
-        ], reason);
-        return;
-      }
+      questionScrollIndex = null;
+      updateQuestionButtonVisibility();
 
       if (useCouncil) {
-        const { category } = selectEngineForPrompt(prompt);
-        await callEngine('gemini');
-        await callEngineMulti('groq', expertsFor('groq', category), 'council');
-        await callEngineMulti('openrouter', expertsFor('openrouter', category), 'council');
+        await runCouncilRound(prompt);
         return;
       }
 
       const mode = document.getElementById('router-mode-select').value;
       if (mode === 'auto') {
-        const choice = selectEngineForPrompt(prompt);
-        if (choice.engine === 'groq' || choice.engine === 'openrouter') {
-          await callEngineMulti(choice.engine, expertsFor(choice.engine, choice.category), `router: ${choice.reason}`);
-        } else {
-          const chain = [
-            { engine: choice.engine, model: null },
-            { engine: 'gemini', model: null },
-            { engine: 'groq', model: 'openai/gpt-oss-120b' },
-            { engine: 'openrouter', model: 'openrouter/free' }
-          ];
-          const seen = new Set();
-          const dedupedChain = chain.filter(item => {
-            const key = item.engine + '|' + (item.model || '');
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-          });
-          await callEngineWithFallback(dedupedChain, `router: ${choice.reason}`);
-        }
+        await handleAutoMode(prompt);
       } else {
         const engine = document.getElementById('engine-select').value;
         if (engine === 'groq-multi' || engine === 'openrouter-multi') {
@@ -1470,18 +1707,6 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       }
       // Enter solo (sin Ctrl/Cmd) inserta un salto de línea normal — comportamiento nativo del textarea, no se intercepta.
     });
-
-    function speakText(text) {
-      if (!('speechSynthesis' in window)) {
-        alert('Este navegador no soporta síntesis de voz.');
-        return;
-      }
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'es-419';
-      utterance.rate = 1;
-      window.speechSynthesis.speak(utterance);
-    }
 
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
     const micBtn = document.getElementById('mic-btn');
