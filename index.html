@@ -64,13 +64,22 @@
           <button onclick="toggleChatList()" class="text-lg px-1 text-slate-300">☰</button>
           <h1 class="text-xl font-bold tracking-widest text-teal-400">ÓMHNIBUS</h1>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1.5">
+          <button onclick="toggleChatSearch()" class="text-sm bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-teal-300">🔍</button>
           <button onclick="toggleProjectManager()" class="text-xs bg-amber-950/40 border border-amber-700/60 rounded-lg px-3 py-1 text-amber-300 font-semibold">📁 Proyectos</button>
           <button onclick="createNewChat()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-teal-300 font-semibold">+ Chat</button>
           <button onclick="toggleKeyManager()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-teal-300 font-semibold">⚙️</button>
         </div>
       </div>
-      
+
+      <div id="chat-search-bar" class="hidden items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-2 py-1.5 text-xs">
+        <input id="chat-search-input" type="text" placeholder="Buscar en este chat..." class="flex-1 bg-slate-950 border border-slate-800 rounded px-2 py-1 text-white focus:outline-none" oninput="performChatSearch()">
+        <span id="search-counter" class="text-slate-400 font-mono shrink-0">0/0</span>
+        <button onclick="searchPrev()" class="text-teal-300 px-1">▲</button>
+        <button onclick="searchNext()" class="text-teal-300 px-1">▼</button>
+        <button onclick="toggleChatSearch()" class="text-red-400 px-1">✕</button>
+      </div>
+
       <div id="project-progress-bar" class="hidden w-full bg-slate-950/80 border border-slate-800/80 rounded-lg p-2 text-[10px] space-y-1">
         <div class="flex justify-between items-center text-slate-400">
           <span>Proyecto Activo: <strong id="bar-project-name" class="text-teal-400">Ninguno</strong></span>
@@ -129,9 +138,31 @@
       </div>
     </div>
 
-    <div id="chat-list-panel" class="hidden flex-1 overflow-y-auto my-2 space-y-2">
-      <h3 class="text-sm font-semibold text-teal-400 px-1">Tus chats</h3>
-      <div id="chat-list-items" class="space-y-1"></div>
+    <div id="chat-list-panel" class="hidden flex-1 overflow-y-auto my-2 flex flex-col">
+      <button onclick="createNewChat()" class="w-full flex items-center gap-2 text-amber-400 font-semibold text-sm py-2.5 px-2 rounded-lg hover:bg-slate-900 border border-slate-800 mb-3">
+        <span>➕</span> Nuevo chat
+      </button>
+
+      <div class="mb-3">
+        <h3 class="text-[10px] uppercase tracking-wide text-slate-500 font-semibold px-1 mb-1">Chats</h3>
+        <div id="chat-list-items" class="space-y-1"></div>
+      </div>
+
+      <button onclick="toggleProjectManager()" class="w-full flex items-center gap-2 text-slate-300 text-sm py-2 px-2 rounded-lg hover:bg-slate-900 border-t border-slate-800 pt-3 mt-1">
+        <span>📁</span> Proyectos
+      </button>
+
+      <button disabled class="w-full flex items-center gap-2 text-slate-600 text-sm py-2 px-2 rounded-lg cursor-not-allowed mt-1">
+        <span>🧩</span> Artefactos
+        <span class="text-[9px] ml-auto bg-slate-800 px-1.5 py-0.5 rounded">Próximamente</span>
+      </button>
+
+      <div class="flex-1"></div>
+
+      <div class="border-t border-slate-800 pt-2 flex items-center justify-between">
+        <span id="sidebar-account-email" class="text-[11px] text-slate-400 font-mono truncate"></span>
+        <button onclick="toggleKeyManager()" class="text-slate-400 text-sm shrink-0 pl-2">⚙️</button>
+      </div>
     </div>
 
     <div id="key-manager" class="hidden flex-1 overflow-y-auto my-2 px-1 space-y-4">
@@ -171,6 +202,8 @@
       <div id="empty-notice" class="text-center text-slate-600 mt-20 text-xs px-4">Ecosistema listo. Lanza una instrucción.</div>
       <div id="messages-container" class="space-y-4 flex flex-col"></div>
     </main>
+
+    <button id="scroll-bottom-btn" onclick="scrollChatToBottom()" class="hidden fixed bottom-36 left-1/2 -translate-x-1/2 z-30 bg-slate-800 border border-slate-700 text-teal-300 rounded-full w-9 h-9 items-center justify-center shadow-lg text-sm">⬇</button>
 
     <footer id="controls-footer" class="space-y-2">
 
@@ -370,13 +403,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) return JSON.parse(raw);
       } catch (e) { /* si está corrupto, se recrea abajo */ }
-      const firstId = 'chat_' + Date.now();
-      return {
-        chats: {
-          [firstId]: { id: firstId, title: 'Nuevo chat', createdAt: Date.now(), turns: [] }
-        },
-        currentChatId: firstId
-      };
+      return { chats: {}, currentChatId: null };
     }
 
     function saveState() {
@@ -464,6 +491,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
 
     function initAppAfterLogin() {
       document.getElementById('account-email').innerText = currentUser.email;
+      document.getElementById('sidebar-account-email').innerText = currentUser.email;
       document.getElementById('memory-textarea').value = loadMemory();
       renderChatList();
       renderMessages();
@@ -560,9 +588,20 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       return state.chats[state.currentChatId];
     }
 
+    function ensureCouncilArray(chat) {
+      if (!chat.councilTurns) chat.councilTurns = [];
+      return chat.councilTurns;
+    }
+
+    function getActiveTurns(chat) {
+      if (!chat) return [];
+      if (!chat.turns) chat.turns = [];
+      return useCouncil ? ensureCouncilArray(chat) : chat.turns;
+    }
+
     function createNewChat() {
       const id = 'chat_' + Date.now();
-      state.chats[id] = { id, title: 'Nuevo chat', createdAt: Date.now(), turns: [] };
+      state.chats[id] = { id, title: 'Nuevo chat', createdAt: Date.now(), turns: [], councilTurns: [] };
       state.currentChatId = id;
       saveState();
       renderChatList();
@@ -590,9 +629,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
 
       const remainingIds = Object.keys(state.chats);
       if (remainingIds.length === 0) {
-        const newId = 'chat_' + Date.now();
-        state.chats[newId] = { id: newId, title: 'Nuevo chat', createdAt: Date.now(), turns: [] };
-        state.currentChatId = newId;
+        state.currentChatId = null;
       } else if (state.currentChatId === id) {
         remainingIds.sort((a, b) => state.chats[b].createdAt - state.chats[a].createdAt);
         state.currentChatId = remainingIds[0];
@@ -607,6 +644,11 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       const container = document.getElementById('chat-list-items');
       container.innerHTML = '';
       const ids = Object.keys(state.chats).sort((a, b) => state.chats[b].createdAt - state.chats[a].createdAt);
+
+      if (ids.length === 0) {
+        container.innerHTML = `<div class="text-[11px] text-slate-500 text-center py-3">No tienes chats todavía.</div>`;
+        return;
+      }
 
       for (const id of ids) {
         const chat = state.chats[id];
@@ -864,6 +906,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
         syncManualRowVisibility();
       }
       updateSettingsSummary();
+      renderMessages();
     });
 
     function syncManualRowVisibility() {
@@ -920,12 +963,16 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       container.innerHTML = '';
       const chat = currentChat();
       const emptyNotice = document.getElementById('empty-notice');
+      const turns = chat ? getActiveTurns(chat) : [];
 
-      if (!chat || chat.turns.length === 0) {
+      if (!chat || turns.length === 0) {
         emptyNotice.classList.remove('hidden');
+        emptyNotice.innerText = useCouncil
+          ? 'Modo Council activo — este hilo tiene su propia memoria, aún vacía.'
+          : 'Ecosistema listo. Lanza una instrucción.';
       } else {
         emptyNotice.classList.add('hidden');
-        for (const turn of chat.turns) {
+        for (const turn of turns) {
           if (turn.role === 'user') {
             appendUserMessageToDOM(turn.content);
           } else {
@@ -935,20 +982,26 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       }
       const screen = document.getElementById('chat-screen');
       screen.scrollTop = screen.scrollHeight;
+      updateScrollButtonVisibility();
     }
 
     function appendUserMessageToDOM(text) {
       const container = document.getElementById('messages-container');
       const msgDiv = document.createElement('div');
       msgDiv.className = 'p-3 rounded-2xl max-w-[85%] bg-teal-600 text-white ml-auto whitespace-pre-wrap text-sm shadow-md my-1 self-end';
+      msgDiv.setAttribute('data-searchable', 'true');
       msgDiv.innerText = text;
       container.appendChild(msgDiv);
+      const screen = document.getElementById('chat-screen');
+      screen.scrollTop = screen.scrollHeight;
+      updateScrollButtonVisibility();
     }
 
     function appendEngineMessageToDOM(name, content, statusText, statusClass) {
       const container = document.getElementById('messages-container');
       const div = document.createElement('div');
       div.className = 'p-3 bg-slate-900 border border-slate-800 rounded-2xl text-xs space-y-1 my-1 max-w-[90%] self-start w-full shadow-md';
+      div.setAttribute('data-searchable', 'true');
       div.innerHTML = `
         <div class="flex justify-between items-center border-b border-slate-800 pb-1">
           <span class="font-bold text-teal-400">🤖 ${name}</span>
@@ -963,6 +1016,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       div.querySelector('.speak-btn').onclick = () => speakText(contentEl.innerText);
       const screen = document.getElementById('chat-screen');
       screen.scrollTop = screen.scrollHeight;
+      updateScrollButtonVisibility();
       return { content: contentEl, status: div.children[0].children[1].children[1] };
     }
 
@@ -985,7 +1039,8 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
 
     function buildMessagesForRequest() {
       const chat = currentChat();
-      const recent = chat.turns.slice(-MAX_CONTEXT_TURNS);
+      const turnsSource = getActiveTurns(chat);
+      const recent = turnsSource.slice(-MAX_CONTEXT_TURNS);
 
       const mapped = recent.map(t => {
         let content = t.engineLabel ? `[${t.engineLabel}] ${t.content}` : t.content;
@@ -1005,8 +1060,9 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
 
     function getLastUserPrompt() {
       const chat = currentChat();
-      for (let i = chat.turns.length - 1; i >= 0; i--) {
-        if (chat.turns[i].role === 'user') return chat.turns[i].content;
+      const turns = getActiveTurns(chat);
+      for (let i = turns.length - 1; i >= 0; i--) {
+        if (turns[i].role === 'user') return turns[i].content;
       }
       return '';
     }
@@ -1063,6 +1119,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       const container = document.getElementById('messages-container');
       const outer = document.createElement('div');
       outer.className = 'p-3 bg-slate-900 border border-slate-800 rounded-2xl text-xs space-y-2 my-1 max-w-[92%] self-start w-full shadow-md';
+      outer.setAttribute('data-searchable', 'true');
 
       const header = document.createElement('div');
       header.className = 'font-bold text-teal-400 border-b border-slate-800 pb-1';
@@ -1092,6 +1149,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       container.appendChild(outer);
       const screen = document.getElementById('chat-screen');
       screen.scrollTop = screen.scrollHeight;
+      updateScrollButtonVisibility();
       return subBlocks;
     }
 
@@ -1125,7 +1183,8 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
         .join('\n\n');
 
       const chat = currentChat();
-      chat.turns.push({
+      const turns = getActiveTurns(chat);
+      turns.push({
         role: 'assistant',
         engine,
         engineLabel: `${providerLabel} (multi-modelo: ${models.map(m => m.split('/').pop()).join(', ')})`,
@@ -1161,7 +1220,8 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       const result = await callProvider(`/api/${engine}`, ui, body);
 
       const chat = currentChat();
-      chat.turns.push({
+      const turns = getActiveTurns(chat);
+      turns.push({
         role: 'assistant',
         engine,
         engineLabel: label,
@@ -1171,6 +1231,150 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       });
       saveState();
     }
+
+    // ===== RESPUESTA GARANTIZADA CON CADENA DE RESPALDO (fuera de Council) =====
+    function buildAttemptLabel(attempt, reasonSuffix) {
+      let label = ENGINE_LABELS[attempt.engine] || attempt.engine;
+      if (attempt.engine === 'groq') {
+        label = attempt.model === 'groq/compound' ? 'Groq Compound (búsqueda web en vivo)' : `Groq (${(attempt.model || '').split('/').pop()})`;
+      } else if (attempt.engine === 'openrouter') {
+        label = `OpenRouter (${(attempt.model || '').split('/').pop()})`;
+      }
+      if (reasonSuffix) label += ` — ${reasonSuffix}`;
+      return label;
+    }
+
+    async function callEngineWithFallback(attempts, reasonSuffix) {
+      const chat = currentChat();
+      const fullMessages = buildMessagesForRequest();
+      const liteMessages = fullMessages.slice(-6);
+      const lastPrompt = getLastUserPrompt();
+
+      const firstLabel = buildAttemptLabel(attempts[0], reasonSuffix);
+      const ui = appendEngineMessageToDOM(firstLabel, 'Procesando transmisión de datos...');
+
+      let finalResult = null;
+
+      for (let i = 0; i < attempts.length; i++) {
+        const attempt = attempts[i];
+        const messages = attempt.lite ? liteMessages : fullMessages;
+        const label = buildAttemptLabel(attempt, reasonSuffix);
+        const system = await buildSystemContext(lastPrompt, label, attempt.engine, attempt.model);
+        const body = { messages, system };
+        if (attempt.model) body.model = attempt.model;
+
+        const result = await callProvider(`/api/${attempt.engine}`, ui, body);
+        finalResult = result;
+        if (result.ok) break;
+      }
+
+      const turns = getActiveTurns(chat);
+      turns.push({
+        role: 'assistant',
+        engine: 'auto',
+        engineLabel: firstLabel,
+        content: finalResult.text,
+        statusText: finalResult.ok ? '🟢 NODO ONLINE' : '🔴 ERROR',
+        statusClass: finalResult.ok ? 'text-green-400' : 'text-red-500'
+      });
+      saveState();
+    }
+    // ===== FIN CADENA DE RESPALDO =====
+
+    // ===== SCROLL AL FINAL Y BÚSQUEDA EN EL CHAT =====
+    function updateScrollButtonVisibility() {
+      const screen = document.getElementById('chat-screen');
+      const btn = document.getElementById('scroll-bottom-btn');
+      const distanceFromBottom = screen.scrollHeight - screen.scrollTop - screen.clientHeight;
+      if (distanceFromBottom > 120) {
+        btn.classList.remove('hidden');
+        btn.classList.add('flex');
+      } else {
+        btn.classList.add('hidden');
+        btn.classList.remove('flex');
+      }
+    }
+
+    function scrollChatToBottom() {
+      const screen = document.getElementById('chat-screen');
+      screen.scrollTo({ top: screen.scrollHeight, behavior: 'smooth' });
+      setTimeout(updateScrollButtonVisibility, 300);
+    }
+
+    document.getElementById('chat-screen').addEventListener('scroll', updateScrollButtonVisibility);
+
+    let searchMatches = [];
+    let searchIndex = -1;
+
+    function toggleChatSearch() {
+      const bar = document.getElementById('chat-search-bar');
+      const isHidden = bar.classList.toggle('hidden');
+      if (!isHidden) {
+        bar.classList.add('flex');
+        document.getElementById('chat-search-input').focus();
+      } else {
+        bar.classList.remove('flex');
+        document.getElementById('chat-search-input').value = '';
+        clearSearchHighlights();
+        searchMatches = [];
+        searchIndex = -1;
+        updateSearchCounter();
+      }
+    }
+
+    function performChatSearch() {
+      const query = document.getElementById('chat-search-input').value.trim().toLowerCase();
+      clearSearchHighlights();
+      searchMatches = [];
+      searchIndex = -1;
+      if (!query) { updateSearchCounter(); return; }
+
+      const bubbles = document.querySelectorAll('#messages-container [data-searchable]');
+      bubbles.forEach(el => {
+        if (el.textContent.toLowerCase().includes(query)) {
+          searchMatches.push(el);
+        }
+      });
+
+      updateSearchCounter();
+      if (searchMatches.length > 0) {
+        searchIndex = 0;
+        goToSearchMatch();
+      }
+    }
+
+    function goToSearchMatch() {
+      clearSearchHighlights();
+      if (searchMatches.length === 0) return;
+      const el = searchMatches[searchIndex];
+      el.classList.add('ring-2', 'ring-amber-400');
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      updateSearchCounter();
+    }
+
+    function clearSearchHighlights() {
+      document.querySelectorAll('#messages-container .ring-2').forEach(el => {
+        el.classList.remove('ring-2', 'ring-amber-400');
+      });
+    }
+
+    function updateSearchCounter() {
+      const counter = document.getElementById('search-counter');
+      counter.innerText = searchMatches.length === 0 ? '0/0' : `${searchIndex + 1}/${searchMatches.length}`;
+    }
+
+    function searchNext() {
+      if (searchMatches.length === 0) return;
+      searchIndex = (searchIndex + 1) % searchMatches.length;
+      goToSearchMatch();
+    }
+
+    function searchPrev() {
+      if (searchMatches.length === 0) return;
+      searchIndex = (searchIndex - 1 + searchMatches.length) % searchMatches.length;
+      goToSearchMatch();
+    }
+    // ===== FIN SCROLL Y BÚSQUEDA =====
 
     // ===== INPUT MULTILÍNEA CON AUTO-CRECIMIENTO =====
     const userInputEl = document.getElementById('user-input');
@@ -1187,13 +1391,20 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       const prompt = inputEl.value.trim();
       if (!prompt) return;
 
+      if (!currentChat()) {
+        const id = 'chat_' + Date.now();
+        state.chats[id] = { id, title: 'Nuevo chat', createdAt: Date.now(), turns: [], councilTurns: [] };
+        state.currentChatId = id;
+      }
+
       inputEl.value = '';
       inputEl.style.height = 'auto';
       document.getElementById('empty-notice').classList.add('hidden');
 
       const chat = currentChat();
       setTitleFromFirstMessage(chat, prompt);
-      chat.turns.push({ role: 'user', content: prompt });
+      const turns = getActiveTurns(chat);
+      turns.push({ role: 'user', content: prompt });
       saveState();
       renderChatList();
       appendUserMessageToDOM(prompt);
@@ -1202,7 +1413,12 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
         const reason = isMetaQuestion(prompt)
           ? 'autodiagnóstico verificado con búsqueda web'
           : 'información en tiempo real verificada con búsqueda web';
-        await callEngine('groq', 'groq/compound', reason);
+        await callEngineWithFallback([
+          { engine: 'groq', model: 'groq/compound', lite: true },
+          { engine: 'gemini', model: null },
+          { engine: 'groq', model: 'openai/gpt-oss-120b' },
+          { engine: 'openrouter', model: 'openrouter/free' }
+        ], reason);
         return;
       }
 
@@ -1220,7 +1436,20 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
         if (choice.engine === 'groq' || choice.engine === 'openrouter') {
           await callEngineMulti(choice.engine, expertsFor(choice.engine, choice.category), `router: ${choice.reason}`);
         } else {
-          await callEngine(choice.engine, null, `router: ${choice.reason}`);
+          const chain = [
+            { engine: choice.engine, model: null },
+            { engine: 'gemini', model: null },
+            { engine: 'groq', model: 'openai/gpt-oss-120b' },
+            { engine: 'openrouter', model: 'openrouter/free' }
+          ];
+          const seen = new Set();
+          const dedupedChain = chain.filter(item => {
+            const key = item.engine + '|' + (item.model || '');
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+          await callEngineWithFallback(dedupedChain, `router: ${choice.reason}`);
         }
       } else {
         const engine = document.getElementById('engine-select').value;
