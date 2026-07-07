@@ -1031,26 +1031,159 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       return (EXPERTS[engine] && EXPERTS[engine][category]) || EXPERTS[engine].general;
     }
 
-    // ===== CONTROLES DE VOZ (VELOCIDAD POR BURBUJA) =====
+    // ===== REPRODUCTOR DE VOZ: PLAY/PAUSA + SCRUBBING =====
     const RATE_OPTIONS = [0.25, 0.5, 0.75, 1, 1.5, 2, 2.5, 3, 3.5, 4];
 
-    function buildSpeechControlsHTML() {
-      const opts = RATE_OPTIONS.map(r => `<option value="${r}" ${r === 1 ? 'selected' : ''}>${r}x</option>`).join('');
-      return `<select class="rate-select bg-slate-950 border border-slate-800 text-teal-300 text-[9px] rounded px-1 py-0.5 focus:outline-none" onclick="event.stopPropagation()">${opts}</select><button class="speak-btn text-teal-300 text-xs shrink-0">🔊</button>`;
+    function buildRateOptionsHTML() {
+      return RATE_OPTIONS.map(r => `<option value="${r}" ${r === 1 ? 'selected' : ''}>${r}x</option>`).join('');
     }
 
-    function speakText(text, rate) {
-      if (!('speechSynthesis' in window)) {
-        alert('Este navegador no soporta síntesis de voz.');
-        return;
-      }
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'es-419';
-      utterance.rate = (rate && !isNaN(rate)) ? rate : 1;
-      window.speechSynthesis.speak(utterance);
+    function buildAudioControlsHTML() {
+      return `
+        <div class="audio-controls flex items-center gap-2 mt-1 mb-1" onclick="event.stopPropagation()">
+          <button class="play-pause-btn text-teal-300 text-sm shrink-0 w-5" type="button">▶️</button>
+          <input type="range" class="seek-range flex-1 h-1 accent-teal-400" min="0" max="1000" value="0" step="1">
+          <select class="rate-select bg-slate-950 border border-slate-800 text-teal-300 text-[9px] rounded px-1 py-0.5 focus:outline-none shrink-0">${buildRateOptionsHTML()}</select>
+        </div>`;
     }
-    // ===== FIN CONTROLES DE VOZ =====
+
+    let activeAudioController = null;
+
+    function createAudioController(getText) {
+      const controller = {
+        utterance: null,
+        baseOffset: 0,
+        lastAbsoluteOffset: 0,
+        fullLength: 0,
+        rate: 1,
+        state: 'stopped', // 'stopped' | 'playing' | 'paused'
+        onProgress: () => {},
+        onStateChange: () => {},
+
+        _setState(s) {
+          this.state = s;
+          this.onStateChange(s);
+        },
+
+        _speakFromOffset(offset, rate) {
+          if (!('speechSynthesis' in window)) {
+            alert('Este navegador no soporta síntesis de voz.');
+            return;
+          }
+          window.speechSynthesis.cancel();
+          const text = getText() || '';
+          this.fullLength = text.length;
+          const clamped = Math.max(0, Math.min(offset, Math.max(text.length - 1, 0)));
+          this.baseOffset = clamped;
+          this.lastAbsoluteOffset = clamped;
+          const segment = text.slice(clamped);
+
+          if (!segment.trim()) {
+            this._setState('stopped');
+            this.onProgress(this.fullLength, this.fullLength || 1);
+            return;
+          }
+
+          const utt = new SpeechSynthesisUtterance(segment);
+          utt.lang = 'es-419';
+          utt.rate = rate || this.rate || 1;
+          this.rate = utt.rate;
+
+          utt.onboundary = (e) => {
+            const idx = (typeof e.charIndex === 'number') ? e.charIndex : 0;
+            this.lastAbsoluteOffset = this.baseOffset + idx;
+            this.onProgress(this.lastAbsoluteOffset, this.fullLength || 1);
+          };
+          utt.onend = () => {
+            if (this.utterance !== utt) return;
+            this.onProgress(this.fullLength, this.fullLength || 1);
+            this._setState('stopped');
+            this.baseOffset = 0;
+            this.lastAbsoluteOffset = 0;
+          };
+          utt.onerror = () => {
+            if (this.utterance === utt) this._setState('stopped');
+          };
+
+          this.utterance = utt;
+          if (activeAudioController && activeAudioController !== this) {
+            activeAudioController._setState('stopped');
+          }
+          activeAudioController = this;
+          this._setState('playing');
+          window.speechSynthesis.speak(utt);
+        },
+
+        togglePlayPause(rate) {
+          if (!('speechSynthesis' in window)) {
+            alert('Este navegador no soporta síntesis de voz.');
+            return;
+          }
+          if (this.state === 'playing') {
+            window.speechSynthesis.pause();
+            this._setState('paused');
+          } else if (this.state === 'paused' && activeAudioController === this) {
+            window.speechSynthesis.resume();
+            this._setState('playing');
+          } else {
+            this._speakFromOffset(this.lastAbsoluteOffset || 0, rate);
+          }
+        },
+
+        seekToPercent(pct, rate) {
+          const text = getText() || '';
+          const targetOffset = Math.round(pct * text.length);
+          this._speakFromOffset(targetOffset, rate || this.rate);
+        },
+
+        setRate(rate) {
+          this.rate = rate;
+          if (this.state === 'playing' || this.state === 'paused') {
+            this._speakFromOffset(this.lastAbsoluteOffset || 0, rate);
+          }
+        }
+      };
+      return controller;
+    }
+
+    function wireAudioControlsUI(rootEl, getTextFn) {
+      const playBtn = rootEl.querySelector('.play-pause-btn');
+      const seekRange = rootEl.querySelector('.seek-range');
+      const rateSelect = rootEl.querySelector('.rate-select');
+      const controller = createAudioController(getTextFn);
+
+      let userSeeking = false;
+
+      controller.onProgress = (offset, total) => {
+        if (userSeeking) return;
+        const pct = total > 0 ? Math.round((offset / total) * 1000) : 0;
+        seekRange.value = String(pct);
+      };
+      controller.onStateChange = (state) => {
+        playBtn.innerText = state === 'playing' ? '⏸' : '▶️';
+      };
+
+      playBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        controller.togglePlayPause(parseFloat(rateSelect.value));
+      });
+
+      seekRange.addEventListener('pointerdown', () => { userSeeking = true; });
+      seekRange.addEventListener('touchstart', () => { userSeeking = true; });
+      seekRange.addEventListener('change', () => {
+        const pct = parseFloat(seekRange.value) / 1000;
+        controller.seekToPercent(pct, parseFloat(rateSelect.value));
+        userSeeking = false;
+      });
+
+      rateSelect.addEventListener('click', (e) => e.stopPropagation());
+      rateSelect.addEventListener('change', () => {
+        controller.setRate(parseFloat(rateSelect.value));
+      });
+
+      return controller;
+    }
+    // ===== FIN REPRODUCTOR DE VOZ =====
 
     function renderMessages() {
       const container = document.getElementById('messages-container');
@@ -1107,16 +1240,14 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       div.innerHTML = `
         <div class="flex justify-between items-center border-b border-slate-800 pb-1 gap-1">
           <span class="font-bold text-teal-400 truncate pr-1">🤖 ${name}</span>
-          <div class="flex items-center gap-1 shrink-0">
-            ${buildSpeechControlsHTML()}
-            <span class="status-badge text-[9px] font-mono tracking-wider whitespace-nowrap ${statusClass || 'text-amber-400 animate-pulse'}">${statusText || 'CONECTANDO...'}</span>
-          </div>
+          <span class="status-badge text-[9px] font-mono tracking-wider whitespace-nowrap ${statusClass || 'text-amber-400 animate-pulse'}">${statusText || 'CONECTANDO...'}</span>
         </div>
+        ${buildAudioControlsHTML()}
         <div class="msg-content mt-1 text-slate-300 whitespace-pre-wrap leading-relaxed">${content}</div>`;
       container.appendChild(div);
       const contentEl = div.querySelector('.msg-content');
       const statusEl = div.querySelector('.status-badge');
-      div.querySelector('.speak-btn').onclick = () => speakText(contentEl.innerText, parseFloat(div.querySelector('.rate-select').value));
+      wireAudioControlsUI(div, () => contentEl.innerText);
       const screen = document.getElementById('chat-screen');
       screen.scrollTop = screen.scrollHeight;
       updateScrollButtonVisibility();
@@ -1240,16 +1371,14 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
         sub.innerHTML = `
           <div class="flex justify-between items-center gap-1">
             <span class="text-teal-300 font-semibold truncate pr-1">${m.split('/').pop()}</span>
-            <div class="flex items-center gap-1 shrink-0">
-              ${buildSpeechControlsHTML()}
-              <span class="status-badge text-[9px] text-amber-400 animate-pulse font-mono whitespace-nowrap">CONECTANDO...</span>
-            </div>
+            <span class="status-badge text-[9px] text-amber-400 animate-pulse font-mono whitespace-nowrap">CONECTANDO...</span>
           </div>
+          ${buildAudioControlsHTML()}
           <div class="msg-content text-slate-300 whitespace-pre-wrap leading-relaxed">Procesando...</div>`;
         outer.appendChild(sub);
         const contentEl = sub.querySelector('.msg-content');
         const statusEl = sub.querySelector('.status-badge');
-        sub.querySelector('.speak-btn').onclick = () => speakText(contentEl.innerText, parseFloat(sub.querySelector('.rate-select').value));
+        wireAudioControlsUI(sub, () => contentEl.innerText);
         subBlocks[m] = { status: statusEl, content: contentEl };
       }
 
@@ -1438,15 +1567,13 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       card.innerHTML = `
         <div class="flex justify-between items-center border-b border-slate-800 pb-1 gap-1">
           <span class="font-bold text-teal-400 truncate pr-1">🤖 ${title}</span>
-          <div class="flex items-center gap-1 shrink-0">
-            ${buildSpeechControlsHTML()}
-            <span class="status-badge text-[9px] font-mono tracking-wider text-amber-400 animate-pulse whitespace-nowrap">CONECTANDO...</span>
-          </div>
+          <span class="status-badge text-[9px] font-mono tracking-wider text-amber-400 animate-pulse whitespace-nowrap">CONECTANDO...</span>
         </div>
+        ${buildAudioControlsHTML()}
         <div class="msg-content mt-1 text-slate-300 whitespace-pre-wrap leading-relaxed">Procesando...</div>`;
       const contentEl = card.querySelector('.msg-content');
       const statusEl = card.querySelector('.status-badge');
-      card.querySelector('.speak-btn').onclick = () => speakText(contentEl.innerText, parseFloat(card.querySelector('.rate-select').value));
+      wireAudioControlsUI(card, () => contentEl.innerText);
       return { card, content: contentEl, status: statusEl };
     }
 
