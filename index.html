@@ -26,6 +26,8 @@
     }
     .council-row {
       scrollbar-width: thin;
+      overscroll-behavior-x: contain;
+      touch-action: pan-x;
     }
     .council-row::-webkit-scrollbar {
       height: 4px;
@@ -96,8 +98,6 @@
         </div>
         <div class="flex items-center gap-1.5">
           <button onclick="toggleChatSearch()" class="text-sm bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-teal-300">🔍</button>
-          <button onclick="toggleProjectManager()" class="text-xs bg-amber-950/40 border border-amber-700/60 rounded-lg px-3 py-1 text-amber-300 font-semibold">📁 Proyectos</button>
-          <button onclick="createNewChat()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-teal-300 font-semibold">+ Chat</button>
           <button onclick="toggleKeyManager()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-1 text-teal-300 font-semibold">⚙️</button>
         </div>
       </div>
@@ -169,14 +169,16 @@
     </div>
 
     <div id="chat-list-panel" class="hidden flex-1 overflow-y-auto my-2 flex flex-col">
-      <button onclick="createNewChat()" class="w-full flex items-center gap-2 text-amber-400 font-semibold text-sm py-2.5 px-2 rounded-lg hover:bg-slate-900 border border-slate-800 mb-3">
-        <span>➕</span> Nuevo chat
-      </button>
-
-      <div class="mb-3">
-        <h3 class="text-[10px] uppercase tracking-wide text-slate-500 font-semibold px-1 mb-1">Chats</h3>
-        <div id="chat-list-items" class="space-y-1"></div>
+      <div class="flex gap-2 mb-3">
+        <button onclick="createNewChat('chat')" class="flex-1 flex items-center justify-center gap-1 text-amber-400 font-semibold text-xs py-2.5 px-2 rounded-lg hover:bg-slate-900 border border-slate-800">
+          <span>➕</span> Chat nuevo
+        </button>
+        <button onclick="createNewChat('council')" class="flex-1 flex items-center justify-center gap-1 text-purple-300 font-semibold text-xs py-2.5 px-2 rounded-lg hover:bg-slate-900 border border-slate-800">
+          <span>🏛️</span> Council
+        </button>
       </div>
+
+      <div id="chat-list-items" class="mb-3"></div>
 
       <button onclick="toggleProjectManager()" class="w-full flex items-center gap-2 text-slate-300 text-sm py-2 px-2 rounded-lg hover:bg-slate-900 border-t border-slate-800 pt-3 mt-1">
         <span>📁</span> Proyectos
@@ -228,7 +230,7 @@
       </div>
     </div>
 
-    <main id="chat-screen" class="flex-1 overflow-y-auto overflow-x-hidden my-4 space-y-4 pr-1 text-sm scroll-smooth">
+    <main id="chat-screen" class="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain my-4 space-y-4 pr-1 text-sm scroll-smooth">
       <div id="empty-notice" class="text-center text-slate-600 mt-20 text-xs px-4">Ecosistema listo. Lanza una instrucción.</div>
       <div id="messages-container" class="space-y-4 flex flex-col"></div>
     </main>
@@ -250,50 +252,51 @@
 
       <div id="settings-panel" class="hidden space-y-2">
 
-        <div class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
-          <span class="text-slate-400 pl-1 font-mono">Modo:</span>
-          <select id="router-mode-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
-            <option value="auto">🧠 Auto (siempre prioriza búsqueda web)</option>
-            <option value="manual">🎛️ Manual</option>
-          </select>
+        <div id="chat-mode-settings" class="space-y-2">
+          <div class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
+            <span class="text-slate-400 pl-1 font-mono">Modo:</span>
+            <select id="router-mode-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
+              <option value="auto">🧠 Auto (siempre prioriza búsqueda web)</option>
+              <option value="manual">🎛️ Manual</option>
+            </select>
+          </div>
+
+          <div id="manual-engine-row" class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
+            <span class="text-slate-400 pl-1 font-mono">Motor:</span>
+            <select id="engine-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
+              <option value="gemini">Gemini 3.5 Flash</option>
+              <option value="groq-multi">Groq (multi-modelo, varios expertos)</option>
+              <option value="openrouter-multi">OpenRouter (multi-modelo, varios expertos)</option>
+              <option value="groq">Groq (un solo modelo)</option>
+              <option value="openrouter">OpenRouter (un solo modelo)</option>
+              <option value="openai">OpenAI (requiere billing)</option>
+            </select>
+          </div>
+
+          <div class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
+            <span class="text-slate-400 pl-1 font-mono">Groq Model:</span>
+            <select id="groq-model-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
+              <option value="openai/gpt-oss-120b">openai/gpt-oss-120b (Recomendado)</option>
+              <option value="openai/gpt-oss-20b">openai/gpt-oss-20b</option>
+              <option value="qwen/qwen3.6-27b">qwen/qwen3.6-27b</option>
+              <option value="groq/compound">groq/compound</option>
+              <option value="groq/compound-mini">groq/compound-mini</option>
+              <option value="openai/gpt-oss-safeguard-20b">openai/gpt-oss-safeguard-20b</option>
+            </select>
+          </div>
+
+          <div class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
+            <span class="text-slate-400 pl-1 font-mono">OpenRouter Model:</span>
+            <select id="openrouter-model-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
+              <option value="openrouter/free">openrouter/free (Auto - Recomendado)</option>
+              <option value="meta-llama/llama-3.3-70b-instruct:free">meta-llama/llama-3.3-70b:free</option>
+              <option value="deepseek/deepseek-r1:free">deepseek-r1:free</option>
+            </select>
+          </div>
         </div>
 
-        <button id="council-toggle-btn" class="w-full bg-slate-900 border border-slate-800 py-2 rounded-xl flex items-center justify-center gap-2 text-xs font-semibold transition-all">
-          <span class="w-2 h-2 rounded-full bg-slate-500" id="council-indicator"></span>
-          <span id="council-btn-text" class="text-slate-400">ÓMHNIBUS COUNCIL: DESACTIVADO</span>
-        </button>
-
-        <div id="manual-engine-row" class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
-          <span class="text-slate-400 pl-1 font-mono">Motor:</span>
-          <select id="engine-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
-            <option value="gemini">Gemini 3.5 Flash</option>
-            <option value="groq-multi">Groq (multi-modelo, varios expertos)</option>
-            <option value="openrouter-multi">OpenRouter (multi-modelo, varios expertos)</option>
-            <option value="groq">Groq (un solo modelo)</option>
-            <option value="openrouter">OpenRouter (un solo modelo)</option>
-            <option value="openai">OpenAI (requiere billing)</option>
-          </select>
-        </div>
-
-        <div class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
-          <span class="text-slate-400 pl-1 font-mono">Groq Model:</span>
-          <select id="groq-model-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
-            <option value="openai/gpt-oss-120b">openai/gpt-oss-120b (Recomendado)</option>
-            <option value="openai/gpt-oss-20b">openai/gpt-oss-20b</option>
-            <option value="qwen/qwen3.6-27b">qwen/qwen3.6-27b</option>
-            <option value="groq/compound">groq/compound</option>
-            <option value="groq/compound-mini">groq/compound-mini</option>
-            <option value="openai/gpt-oss-safeguard-20b">openai/gpt-oss-safeguard-20b</option>
-          </select>
-        </div>
-
-        <div class="flex items-center gap-2 bg-slate-950/50 p-1.5 border border-slate-800/60 rounded-xl text-[11px]">
-          <span class="text-slate-400 pl-1 font-mono">OpenRouter Model:</span>
-          <select id="openrouter-model-select" class="flex-1 bg-slate-900 text-teal-300 border border-slate-800 rounded px-2 py-1 focus:outline-none font-mono">
-            <option value="openrouter/free">openrouter/free (Auto - Recomendado)</option>
-            <option value="meta-llama/llama-3.3-70b-instruct:free">meta-llama/llama-3.3-70b:free</option>
-            <option value="deepseek/deepseek-r1:free">deepseek-r1:free</option>
-          </select>
+        <div id="council-mode-note" class="hidden text-[11px] text-purple-300 bg-purple-950/30 border border-purple-800/50 rounded-xl p-2 text-center leading-relaxed">
+          🏛️ Este es un chat Council: cada respuesta se genera en paralelo (Gemini, búsqueda web en vivo y expertos de Groq/OpenRouter) y se muestra en tarjetas lado a lado.
         </div>
 
       </div>
@@ -418,8 +421,8 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
         parts.push(`Dato en tiempo real: el motor que está generando esta respuesta específica es "${engineLabel}".`);
       }
 
-      if (isRealtimeQuestion(prompt) && engine === 'groq' && model === 'groq/compound') {
-        parts.push(`Esta pregunta requiere información actual y verificable. Usa tu búsqueda web en tiempo real antes de responder, y basa tu respuesta en lo que encuentres, no en tu memoria de entrenamiento.`);
+      if (engine === 'groq' && model === 'groq/compound') {
+        parts.push(`Esta consulta puede requerir información actual, un resultado, marcador, fecha reciente o cualquier dato que cambie con el tiempo. Antes de responder, USA tu herramienta de búsqueda web en tiempo real para verificar los hechos — no te bases únicamente en tu memoria de entrenamiento. Si tras buscar no encuentras el dato exacto, dilo explícitamente en vez de inventar una respuesta.`);
       }
 
       return capSystemPrompt(parts.join('\n\n'));
@@ -529,6 +532,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       renderChatList();
       renderMessages();
       updateProgressBar();
+      syncSettingsPanelForMode();
       showApp();
     }
 
@@ -626,19 +630,31 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       return chat.councilTurns;
     }
 
+    function isCouncilChat(chat) {
+      return !!(chat && chat.mode === 'council');
+    }
+
     function getActiveTurns(chat) {
       if (!chat) return [];
       if (!chat.turns) chat.turns = [];
-      return useCouncil ? ensureCouncilArray(chat) : chat.turns;
+      return chat.turns;
     }
 
-    function createNewChat() {
+    function createNewChat(mode) {
+      const chatMode = mode === 'council' ? 'council' : 'chat';
       const id = 'chat_' + Date.now();
-      state.chats[id] = { id, title: 'Nuevo chat', createdAt: Date.now(), turns: [], councilTurns: [] };
+      state.chats[id] = {
+        id,
+        title: chatMode === 'council' ? 'Nuevo Council' : 'Nuevo chat',
+        createdAt: Date.now(),
+        turns: [],
+        mode: chatMode
+      };
       state.currentChatId = id;
       saveState();
       renderChatList();
       renderMessages();
+      syncSettingsPanelForMode();
       document.getElementById('chat-list-panel').classList.add('hidden');
       document.getElementById('project-manager-panel').classList.add('hidden');
       document.getElementById('chat-screen').style.display = 'block';
@@ -649,6 +665,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       saveState();
       renderChatList();
       renderMessages();
+      syncSettingsPanelForMode();
       document.getElementById('chat-list-panel').classList.add('hidden');
       document.getElementById('project-manager-panel').classList.add('hidden');
       document.getElementById('chat-screen').style.display = 'block';
@@ -676,33 +693,57 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
     function renderChatList() {
       const container = document.getElementById('chat-list-items');
       container.innerHTML = '';
-      const ids = Object.keys(state.chats).sort((a, b) => state.chats[b].createdAt - state.chats[a].createdAt);
+      const allIds = Object.keys(state.chats).sort((a, b) => state.chats[b].createdAt - state.chats[a].createdAt);
+      const chatIds = allIds.filter(id => (state.chats[id].mode || 'chat') !== 'council');
+      const councilIds = allIds.filter(id => state.chats[id].mode === 'council');
 
-      if (ids.length === 0) {
-        container.innerHTML = `<div class="text-[11px] text-slate-500 text-center py-3">No tienes chats todavía.</div>`;
-        return;
+      function buildSection(title, ids) {
+        const section = document.createElement('div');
+        section.className = 'mb-3';
+
+        const heading = document.createElement('h3');
+        heading.className = 'text-[10px] uppercase tracking-wide text-slate-500 font-semibold px-1 mb-1';
+        heading.innerText = title;
+        section.appendChild(heading);
+
+        if (ids.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'text-[11px] text-slate-500 text-center py-2';
+          empty.innerText = 'No tienes chats aquí todavía.';
+          section.appendChild(empty);
+          return section;
+        }
+
+        const list = document.createElement('div');
+        list.className = 'space-y-1';
+
+        for (const id of ids) {
+          const chat = state.chats[id];
+          const isActive = id === state.currentChatId;
+          const item = document.createElement('div');
+          item.className = `flex items-center justify-between gap-2 p-2.5 rounded-lg border cursor-pointer text-xs ${isActive ? 'bg-teal-950 border-teal-700 text-teal-300' : 'bg-slate-900 border-slate-800 text-slate-300'}`;
+          item.onclick = () => switchChat(id);
+
+          const label = document.createElement('span');
+          label.className = 'truncate flex-1';
+          label.innerText = chat.title;
+
+          const delBtn = document.createElement('button');
+          delBtn.className = 'text-red-400 px-1.5 shrink-0';
+          delBtn.innerText = '🗑';
+          delBtn.onclick = (e) => deleteChat(id, e);
+
+          item.appendChild(label);
+          item.appendChild(delBtn);
+          list.appendChild(item);
+        }
+
+        section.appendChild(list);
+        return section;
       }
 
-      for (const id of ids) {
-        const chat = state.chats[id];
-        const isActive = id === state.currentChatId;
-        const item = document.createElement('div');
-        item.className = `flex items-center justify-between gap-2 p-2.5 rounded-lg border cursor-pointer text-xs ${isActive ? 'bg-teal-950 border-teal-700 text-teal-300' : 'bg-slate-900 border-slate-800 text-slate-300'}`;
-        item.onclick = () => switchChat(id);
-
-        const label = document.createElement('span');
-        label.className = 'truncate flex-1';
-        label.innerText = chat.title;
-
-        const delBtn = document.createElement('button');
-        delBtn.className = 'text-red-400 px-1.5 shrink-0';
-        delBtn.innerText = '🗑';
-        delBtn.onclick = (e) => deleteChat(id, e);
-
-        item.appendChild(label);
-        item.appendChild(delBtn);
-        container.appendChild(item);
-      }
+      container.appendChild(buildSection('💬 Chats', chatIds));
+      container.appendChild(buildSection('🏛️ Council', councilIds));
     }
 
     function setTitleFromFirstMessage(chat, text) {
@@ -899,8 +940,15 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
     };
 
     function updateSettingsSummary() {
-      const mode = document.getElementById('router-mode-select').value;
+      const chat = currentChat();
       const summaryEl = document.getElementById('settings-summary');
+
+      if (isCouncilChat(chat)) {
+        summaryEl.innerText = '🏛️ Council';
+        return;
+      }
+
+      const mode = document.getElementById('router-mode-select').value;
       let text = mode === 'auto' ? '🧠 Auto' : '🎛️ Manual';
 
       if (mode === 'manual') {
@@ -911,7 +959,6 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
         text += ' · ' + (label || engine);
       }
 
-      if (useCouncil) text += ' · Council ON';
       summaryEl.innerText = text;
     }
 
@@ -921,34 +968,24 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
     document.getElementById('openrouter-model-select').addEventListener('change', updateSettingsSummary);
     // ===== FIN PANEL DE OPCIONES =====
 
-    let useCouncil = false;
     let lastCouncilRow = null;
     let questionScrollIndex = null;
 
-    document.getElementById('council-toggle-btn').addEventListener('click', () => {
-      useCouncil = !useCouncil;
-      const indicator = document.getElementById('council-indicator');
-      const text = document.getElementById('council-btn-text');
-      const manualRow = document.getElementById('manual-engine-row');
-      if (useCouncil) {
-        indicator.className = "w-2 h-2 rounded-full bg-amber-400 animate-pulse";
-        text.innerText = 'ÓMHNIBUS COUNCIL: MODO LATERAL ACTIVO (desliza →)';
-        text.className = 'text-amber-400 font-semibold';
-        manualRow.classList.add('hidden');
-      } else {
-        indicator.className = "w-2 h-2 rounded-full bg-slate-500";
-        text.innerText = 'ÓMHNIBUS COUNCIL: DESACTIVADO';
-        text.className = 'text-slate-400';
-        syncManualRowVisibility();
-      }
+    function syncSettingsPanelForMode() {
+      const chat = currentChat();
+      const councilChat = isCouncilChat(chat);
+      document.getElementById('chat-mode-settings').classList.toggle('hidden', councilChat);
+      document.getElementById('council-mode-note').classList.toggle('hidden', !councilChat);
+      syncManualRowVisibility();
       updateSettingsSummary();
-      renderMessages();
-    });
+    }
 
     function syncManualRowVisibility() {
+      const chat = currentChat();
+      const councilChat = isCouncilChat(chat);
       const mode = document.getElementById('router-mode-select').value;
       const manualRow = document.getElementById('manual-engine-row');
-      if (!useCouncil && mode === 'manual') {
+      if (!councilChat && mode === 'manual') {
         manualRow.classList.remove('hidden');
       } else {
         manualRow.classList.add('hidden');
@@ -1019,6 +1056,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       const container = document.getElementById('messages-container');
       container.innerHTML = '';
       const chat = currentChat();
+      const councilChat = isCouncilChat(chat);
       const emptyNotice = document.getElementById('empty-notice');
       const turns = chat ? getActiveTurns(chat) : [];
 
@@ -1027,8 +1065,8 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
 
       if (!chat || turns.length === 0) {
         emptyNotice.classList.remove('hidden');
-        emptyNotice.innerText = useCouncil
-          ? 'Modo Council activo — este hilo tiene su propia memoria, aún vacía.'
+        emptyNotice.innerText = councilChat
+          ? 'Chat Council — cada motor responderá en su propia tarjeta, desliza lateralmente →'
           : 'Ecosistema listo. Lanza una instrucción.';
       } else {
         emptyNotice.classList.add('hidden');
@@ -1455,8 +1493,8 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       const online = navigator.onLine;
 
       const calls = [];
+      if (online) calls.push({ title: '🔎 Búsqueda Web (Groq Compound)', engine: 'groq', model: 'groq/compound' });
       calls.push({ title: 'Gemini 3.5 Flash', engine: 'gemini', model: null });
-      if (online) calls.push({ title: 'Búsqueda Web (Groq Compound)', engine: 'groq', model: 'groq/compound' });
       groqModels.forEach(m => calls.push({ title: 'Groq: ' + m.split('/').pop(), engine: 'groq', model: m }));
       orModels.forEach(m => calls.push({ title: 'OpenRouter: ' + m.split('/').pop(), engine: 'openrouter', model: m }));
 
@@ -1482,7 +1520,8 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
     // ===== SCROLL (VERTICAL / LATERAL) Y NAVEGACIÓN ENTRE PREGUNTAS =====
     function updateScrollButtonVisibility() {
       const btn = document.getElementById('scroll-bottom-btn');
-      if (useCouncil && lastCouncilRow) {
+      const councilChat = isCouncilChat(currentChat());
+      if (councilChat && lastCouncilRow) {
         btn.innerText = '▶';
         const remaining = lastCouncilRow.scrollWidth - lastCouncilRow.scrollLeft - lastCouncilRow.clientWidth;
         if (remaining > 20) { btn.classList.remove('hidden'); btn.classList.add('flex'); }
@@ -1503,7 +1542,8 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
     }
 
     function handleFloatingScrollBtn() {
-      if (useCouncil && lastCouncilRow) {
+      const councilChat = isCouncilChat(currentChat());
+      if (councilChat && lastCouncilRow) {
         lastCouncilRow.scrollBy({ left: lastCouncilRow.clientWidth * 0.9, behavior: 'smooth' });
         setTimeout(updateScrollButtonVisibility, 350);
       } else {
@@ -1676,7 +1716,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
 
       if (!currentChat()) {
         const id = 'chat_' + Date.now();
-        state.chats[id] = { id, title: 'Nuevo chat', createdAt: Date.now(), turns: [], councilTurns: [] };
+        state.chats[id] = { id, title: 'Nuevo chat', createdAt: Date.now(), turns: [], mode: 'chat' };
         state.currentChatId = id;
       }
 
@@ -1694,7 +1734,7 @@ Nota: Adapta tus respuestas de código y arquitectura a este contexto técnico o
       questionScrollIndex = null;
       updateQuestionButtonVisibility();
 
-      if (useCouncil) {
+      if (isCouncilChat(chat)) {
         await runCouncilRound(prompt);
         return;
       }
